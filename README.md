@@ -1,2 +1,2 @@
-# DeepSEOConference
-Scripts and notes related to my talk at the DeepSEO Conference 2021
+# GA4 Scripts
+Some pubic scripts related to enhanced tracking in Google Analytics 4 
