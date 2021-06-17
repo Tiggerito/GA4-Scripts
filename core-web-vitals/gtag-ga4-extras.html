@@ -1,0 +1,21 @@
+<script>
+function getEffectiveConnectionType(){
+    var connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+    
+    if(connection && connection.effectiveType) return connection.effectiveType;
+
+    return 'unknown';
+}
+</script>
+<!-- Global site tag (gtag.js) - Google Analytics -->
+<script async="async" src="https://www.googletagmanager.com/gtag/js?id=G-0BQR1PRHYJ"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-0BQR1PRHYJ', {
+    page_type: 'PAGE TYPE NAME', 
+    effective_connection_type: getEffectiveConnectionType()
+ });
+</script>
