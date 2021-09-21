@@ -96,7 +96,7 @@ function getRating(name, value) {
 function calculateRating(value, good, poor) {
     if (!value && value !== 0) return '(not set)';
     if (value > poor) return 'poor';
-    if (value > good) return 'in';   
+    if (value > good) return 'ni';   
     return 'good';
 }
 
