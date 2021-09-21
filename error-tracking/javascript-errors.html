@@ -1,0 +1,277 @@
+<script>
+    var useGTM = false; // if false uses gtag
+    /*
+        Web Site Advantage: Javascript and resource loading error tracking for GA4 [v2.1]
+        https://bigcommerce.websiteadvantage.com.au/error-tracking-with-ga4/
+    */
+
+    function sendGa4Event(event, options) {
+        
+        window.dataLayer = window.dataLayer || [];
+
+        if (useGTM) {     
+            // send the GA4 event via the dataLayer
+            dataLayer.push({
+                event: event,
+                error: options
+            });
+        } else {
+            // Ensure gtag is made present so that this code can be placed before the gtag code
+            if (!window.gtag) { 
+                window.gtag = function gtag(){dataLayer.push(arguments);}
+            }
+        
+            gtag('event', event, options);
+        }
+    }
+
+    // helper to add event listeners to elements in a cross browser way
+    function addOrAttachEventListener(target, type, listener, options) {
+        if (target.addEventListener) {               // For all major browsers, except IE 8 and earlier
+            target.addEventListener(type, listener, options);
+        } else if (element.attachEvent) {               // For IE 8 and earlier versions
+            target.attachEvent('on'+type, listener);
+        }
+    }
+
+    // GTM has a built in JavaScript Error Listener
+    if (typeof window.onerror == "object") { // test to see if the onerror event exists
+
+        var onErrorHandling = false; 
+
+        addOrAttachEventListener(window, 'error', function(messageOrEvent, filename, lineno, colno, error) { 
+          
+            if (!onErrorHandling) {  // so error handling does not cause a recursive loop
+
+                try {
+                    onErrorHandling = true;
+
+                    if(messageOrEvent.target && messageOrEvent.target !== window && messageOrEvent.target.nodeName){
+                        // it's a resource loading error.
+
+                        var target = messageOrEvent.target;
+                                            
+                        var targetUrl = target.src || target.href;  // url is in either a src or href attributes    
+
+                        var error_options = {
+                            error_type: 'network',
+                            error_message: 'Load ' + target.nodeName + ' tag error', 
+                            error_object_type: target.nodeName,
+                            error_filename: targetUrl,
+                            fatal: false  
+                        };
+
+                        error_options.description = error_options.message + ' ' + targetUrl;
+
+                        sendGa4Event('exception', error_options);    
+
+                    } else {
+                        // it's a Javascript error
+                    
+                        var error_options = {
+                            error_type: 'javascript', 
+                            error_object_type: "Unknown",
+                            error_message: "Unknown", 
+                            description: 'Javascript',
+                            fatal: false
+                        };
+
+                        if (messageOrEvent) {
+                            if (typeof messageOrEvent === 'string') {
+                                error_options.error_message = messageOrEvent;
+                                error_options.error_object_type = "Message";
+
+                            } else {   
+                                                   
+                                error_options.error_filename = messageOrEvent.filename;
+                                error_options.error_lineno = messageOrEvent.lineno;
+                                error_options.error_colno = messageOrEvent.colno;
+                                error_options.error_error = messageOrEvent.error;
+                                error_options.error_message = messageOrEvent.message;
+
+                                if (messageOrEvent.filename) { // it's an event
+                                    error_options.error_object_type = "Event";    
+
+                                } else if (messageOrEvent.originalEvent) { // it's been intercepted
+
+                                    error_options.error_object_type = "Intercepted Event";  
+
+                                    error_options.error_filename = error_options.error_filename || messageOrEvent.originalEvent.filename;
+                                    error_options.error_lineno = error_options.error_lineno || messageOrEvent.originalEvent.lineno;
+                                    error_options.error_colno = error_options.error_colno || messageOrEvent.originalEvent.colno;
+                                    error_options.error_error = error_options.error_error || messageOrEvent.originalEvent.error;
+                                    error_options.error_message = error_options.error_message || messageOrEvent.originalEvent.message;    
+
+                                } else {
+                                    error_options.error_object_type = "Object";  
+                                    error_options.error_message = JSON.stringify(messageOrEvent, Object.getOwnPropertyNames(messageOrEvent)); // attempt to get properties that normally don't get included
+                                }
+                            }
+                        }
+                    
+                        // create the description, a summary of the error in one line, useful for realtime checking
+                        if (error_options.error_filename) error_options.description += ': ' + error_options.error_filename;
+
+                        if (error_options.error_lineno) {
+                            error_options.description += ': L' + error_options.error_lineno;
+                            if (error_options.error_colno) {
+                                error_options.description += ' C' + error_options.error_colno;
+                            }
+                        }
+                        if (error_options.error_message) error_options.description += ': ' + error_options.error_message;
+
+                        // make sure error_error is a string
+                        if (error_options.error_error && typeof error_options.error_error !== 'string') {
+                            error_options.error_error = JSON.stringify(error_options.error_error, Object.getOwnPropertyNames(error_options.error_error));
+                        }
+
+                        // dump the error object into error_data
+                        if (messageOrEvent && typeof messageOrEvent !== 'string') {
+                            error_options.error_data = JSON.stringify(messageOrEvent, Object.getOwnPropertyNames(messageOrEvent));
+                        }
+
+                        sendGa4Event('exception', error_options);
+                    }
+                }
+                catch (err) {
+                    console.log("OnErrorHandling ERROR: ",err);
+
+                    sendGa4Event('exception', {
+                        error_type: 'javascript', 
+                        error_object_type: "Handler ERROR",
+                        error_message: "The error processor had an error!", 
+                        description: 'The error processor had an error!',
+                        fatal: false
+                    });
+                }
+                finally {
+                    onErrorHandling = false;
+                };
+            }
+            return false; // let the default handler do its job
+        }, {
+            passive:true, // passive means does not call preventDefault(). Faster
+            capture: true // capture so it gets errors which don't make it to the top in the bubble phase. e.g. resource load errors
+        }); 
+    }
+
+    // track console errors
+    console.error_previous = console.error;
+    console.error = function() {
+        console.error_previous.apply(console, arguments); // make sure it still outputs the error
+
+        sendGa4Event('exception', {
+            error_type: 'console', 
+            error_message: '' + arguments[0], 
+            description: 'Console: ' + arguments[0],
+            fatal: false
+        });
+    };
+
+    // track XMLHttpRequest
+    if(window.XMLHttpRequest && window.XMLHttpRequest.prototype) { 
+
+        var prototype = window.XMLHttpRequest.prototype;
+
+        if(prototype.send && prototype.send.apply) {
+            prototype.send_previous = prototype.send;
+
+            prototype.send = function() {
+                var xmlHttpRequest = this;
+
+                addOrAttachEventListener(this, 'readystatechange', function(){ 
+                    try {
+                        if (xmlHttpRequest.readyState == 4) { 
+                            if (xmlHttpRequest.status >= 400 || xmlHttpRequest.status === 0) { // 0 includes cors errors
+                                sendGa4Event('exception', {
+                                    error_type: 'network', 
+                                    error_message: xmlHttpRequest.status, 
+                                    error_filename: xmlHttpRequest.responseURL,
+                                    description: 'XMLHttpRequest Response: ' + xmlHttpRequest.status + ': ' + xmlHttpRequest.responseURL,
+                                    fatal: false
+                                });
+                            };
+                        };
+                    } catch(err) {} // don't want our code causing anything to fail
+                });
+                return prototype.send_previous.apply(this, arguments)
+            };
+        };
+    };
+
+
+    // track fetch requests
+    if(window.fetch && window.fetch.apply){
+        window.fetch_previous = window.fetch;
+
+        window.fetch = function(url) {
+            return window.fetch_previous.apply(this,arguments)
+            .then(function(response){
+                try {
+                    if(response.status >= 400){                   
+                        sendGa4Event('exception', {
+                            error_type: 'network', 
+                            error_message: response.status, 
+                            error_filename: response.url,
+                            description: 'Fetch Response: ' + response.status + ': ' + response.url,
+                            fatal: false
+                        });
+                    };
+                } catch(err) {} // don't want our code causing anything to fail
+
+                return response;
+            })
+            .catch(function (error) {
+                try {
+                    sendGa4Event('exception', {
+                        error_type: 'network',
+                        error_message: error,
+                        error_filename: url,
+                        description: 'Fetch Error: ' + error,
+                        fatal: false
+                    });
+
+                } catch (err) { } // don't want our code causing anything to fail
+
+                throw error; // propagate the exception 
+            });
+        };
+    };
+
+    // track beacons
+    if(navigator && navigator.sendBeacon) {
+        navigator.sendBeacon_previous = navigator.sendBeacon;
+
+        navigator.sendBeacon = function(url, data) {
+            navigator.sendBeacon_previous.apply(this, arguments);
+
+            var size = data && data.length || 0;
+
+            // GA4 beacons have a limit of 16*1024 (16384)
+        };
+    };
+
+    // track json-ld syntax errors
+    setTimeout(function() {
+        var jsonLdScripts = document.querySelectorAll("script[type='application/ld+json']");
+
+        for(var i=0; i<jsonLdScripts.length; i++){
+            var jsonLdScriptText = jsonLdScripts[i].text.trim();
+
+            if(jsonLdScriptText !== '') { // consider a blank one as fine
+                try {
+                    JSON.parse(jsonLdScriptText);
+                }
+                catch(err) {
+                    sendGa4Event('exception', {
+                        error_type: 'jsonld', 
+                        error_message: ''+err, 
+                        description: 'JSON-LD: '+err,
+                        fatal: false
+                    });
+                }
+            }
+        }
+
+    }, 5000); // give the page 5 seconds to load any structured data
+</script>
