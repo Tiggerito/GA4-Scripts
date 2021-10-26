@@ -36,6 +36,18 @@ SELECT
             WHEN metric_value <= 300 THEN 'Needs Improvement'
             ELSE 'Poor'
         END
+    WHEN 'TTFB' THEN 
+        CASE 
+            WHEN metric_value <= 500 THEN 'Good'
+            WHEN metric_value <= 1500 THEN 'Needs Improvement'
+            ELSE 'Poor'
+        END
+    WHEN 'FCP' THEN 
+        CASE 
+            WHEN metric_value <= 2.000 THEN 'Good'
+            WHEN metric_value <= 4.000 THEN 'Needs Improvement'
+            ELSE 'Poor'
+        END
   END AS metric_status
   # Tony's additions 1 END
 
@@ -60,7 +72,8 @@ FROM
             event_timestamp,
             event_name,
             metric_id,
-            IF(event_name = 'LCP', metric_value / 1000, metric_value) AS metric_value,
+            # Tony's modification to support FCP
+            IF(event_name = 'LCP' OR event_name = 'FCP', metric_value / 1000, metric_value) AS metric_value,
             user_pseudo_id,
             session_engaged,
             session_revenue,
@@ -127,7 +140,8 @@ FROM
               # Replace source table name
               `your_project.analytics_123456789.events_*`
             WHERE
-              event_name IN ('LCP', 'FID', 'CLS', 'first_visit', 'purchase')
+              # Tony's modification to support TTFB and FCP
+              event_name IN ('LCP', 'FID', 'CLS', 'TTFB', 'FCP', 'first_visit', 'purchase')
             GROUP BY
               1, 2
           )

@@ -148,6 +148,8 @@ function sendToGoogleAnalytics({name, delta, value, id, entries}) {
     webVitals.getCLS(sendToGoogleAnalytics);
     webVitals.getFID(sendToGoogleAnalytics);
     webVitals.getLCP(sendToGoogleAnalytics);
+    webVitals.getFCP(sendToGoogleAnalytics);
+    webVitals.getTTFB(sendToGoogleAnalytics);
   }
   document.head.appendChild(script);
 }())
