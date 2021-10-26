@@ -72,8 +72,8 @@ FROM
             event_timestamp,
             event_name,
             metric_id,
-            # Tony's modification to support FCP
-            IF(event_name = 'LCP' OR event_name = 'FCP', metric_value / 1000, metric_value) AS metric_value,
+            # Tony's modification to support TTFB and FCP
+            IF(event_name = 'LCP' OR event_name = 'TTFB' OR event_name = 'FCP', metric_value / 1000, metric_value) AS metric_value,
             user_pseudo_id,
             session_engaged,
             session_revenue,
