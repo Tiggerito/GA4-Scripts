@@ -1,5 +1,5 @@
 #  Replace target table name
-CREATE OR REPLACE TABLE your_project.analytics_123456789.web_vitals_summary
+CREATE OR REPLACE TABLE `your-project.analytics_123456789.web_vitals_summary`
   PARTITION BY DATE(event_timestamp)
   CLUSTER BY metric_name
 AS
@@ -138,7 +138,7 @@ FROM
 
             FROM
               # Replace source table name
-              `your_project.analytics_123456789.events_*`
+              `your-project.analytics_123456789.events_*`
             WHERE
               # Tony's modification to support TTFB and FCP
               event_name IN ('LCP', 'FID', 'CLS', 'TTFB', 'FCP', 'first_visit', 'purchase')
