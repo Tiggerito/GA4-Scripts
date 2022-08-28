@@ -38,14 +38,14 @@ SELECT
         END
     WHEN 'TTFB' THEN 
         CASE 
-            WHEN metric_value <= 500 THEN 'Good'
-            WHEN metric_value <= 1500 THEN 'Needs Improvement'
+            WHEN metric_value <= 0.800 THEN 'Good'
+            WHEN metric_value <= 1.800 THEN 'Needs Improvement'
             ELSE 'Poor'
         END
     WHEN 'FCP' THEN 
         CASE 
-            WHEN metric_value <= 2.000 THEN 'Good'
-            WHEN metric_value <= 4.000 THEN 'Needs Improvement'
+            WHEN metric_value <= 1.800 THEN 'Good'
+            WHEN metric_value <= 3.000 THEN 'Needs Improvement'
             ELSE 'Poor'
         END
   END AS metric_status
