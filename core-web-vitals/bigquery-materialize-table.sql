@@ -17,37 +17,12 @@ SELECT
   FORMAT_TIMESTAMP('%Y%m%d', event_timestamp) AS event_date,
   
   # Tony's additions 1 START
-  CASE event_name
-    WHEN 'CLS' THEN 
-        CASE 
-            WHEN metric_value <= 0.1 THEN 'Good'
-            WHEN metric_value <= 0.25 THEN 'Needs Improvement'
-            ELSE 'Poor'
-        END
-    WHEN 'LCP' THEN 
-        CASE 
-            WHEN metric_value <= 2.500 THEN 'Good'
-            WHEN metric_value <= 4.000 THEN 'Needs Improvement'
-            ELSE 'Poor'
-        END
-    WHEN 'FID' THEN 
-        CASE 
-            WHEN metric_value <= 100 THEN 'Good'
-            WHEN metric_value <= 300 THEN 'Needs Improvement'
-            ELSE 'Poor'
-        END
-    WHEN 'TTFB' THEN 
-        CASE 
-            WHEN metric_value <= 0.800 THEN 'Good'
-            WHEN metric_value <= 1.800 THEN 'Needs Improvement'
-            ELSE 'Poor'
-        END
-    WHEN 'FCP' THEN 
-        CASE 
-            WHEN metric_value <= 1.800 THEN 'Good'
-            WHEN metric_value <= 3.000 THEN 'Needs Improvement'
-            ELSE 'Poor'
-        END
+  CASE metric_rating
+    WHEN 'good' THEN 'Good'
+    WHEN 'ni' THEN 'Needs Improvement'
+    WHEN 'needs-improvement' THEN 'Needs Improvement'
+    WHEN 'poor' THEN 'Poor'
+    ELSE metric_rating
   END AS metric_status
   # Tony's additions 1 END
 
@@ -72,19 +47,21 @@ FROM
             event_timestamp,
             event_name,
             metric_id,
-            # Tony's modification to support TTFB and FCP
+            # Tony's modification to also support TTFB and FCP
             IF(event_name = 'LCP' OR event_name = 'TTFB' OR event_name = 'FCP', metric_value / 1000, metric_value) AS metric_value,
             user_pseudo_id,
             session_engaged,
             session_revenue,
 
             # Tony's additions 2 START
+            metric_rating,
             page_location,
             page_type,
             continent,
             region,
             device_browser,
-            effective_connection_type
+            effective_connection_type,
+            save_data
             # Tony's additions 2 END
 
             ) AS custom_event
@@ -128,12 +105,14 @@ FROM
                 )) AS metric_value,
 
                 # Tony's additions 3 START
+                ANY_VALUE((SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'metric_rating')) AS metric_rating,
                 ANY_VALUE((SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'page_location')) AS page_location,
                 ANY_VALUE((SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'page_type')) AS page_type,
                 ANY_VALUE(geo.continent) AS continent,
                 ANY_VALUE(geo.region) AS region,
                 ANY_VALUE(device.web_info.browser) AS device_browser,
-                ANY_VALUE((SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'effective_connection_type')) AS effective_connection_type
+                ANY_VALUE((SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'effective_connection_type')) AS effective_connection_type,
+                ANY_VALUE((SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'save_data')) AS save_data
                 # Tony's additions 3 END
 
             FROM
@@ -141,7 +120,7 @@ FROM
               `your-project.analytics_123456789.events_*`
             WHERE
               # Tony's modification to support TTFB and FCP
-              event_name IN ('LCP', 'FID', 'CLS', 'TTFB', 'FCP', 'first_visit', 'purchase')
+              event_name IN ('LCP', 'FID', 'CLS', 'TTFB', 'FCP', 'INP', 'first_visit', 'purchase')
             GROUP BY
               1, 2
           )
