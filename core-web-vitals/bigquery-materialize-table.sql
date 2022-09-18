@@ -1,4 +1,6 @@
-#  Replace target table name
+# Replace target table name
+# Web Vitals Summary Materialised Table v3.0
+# https://github.com/Tiggerito/GA4-Scripts/blob/main/core-web-vitals/bigquery-materialize-table.sql
 CREATE OR REPLACE TABLE `your-project.analytics_123456789.web_vitals_summary`
   PARTITION BY DATE(event_timestamp)
   CLUSTER BY metric_name
@@ -61,7 +63,9 @@ FROM
             region,
             device_browser,
             effective_connection_type,
-            save_data
+            save_data,
+            width,
+            height
             # Tony's additions 2 END
 
             ) AS custom_event
@@ -112,7 +116,9 @@ FROM
                 ANY_VALUE(geo.region) AS region,
                 ANY_VALUE(device.web_info.browser) AS device_browser,
                 ANY_VALUE((SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'effective_connection_type')) AS effective_connection_type,
-                ANY_VALUE((SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'save_data')) AS save_data
+                ANY_VALUE((SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'save_data')) AS save_data,
+                ANY_VALUE((SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'width')) AS width,
+                ANY_VALUE((SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'height')) AS height
                 # Tony's additions 3 END
 
             FROM
