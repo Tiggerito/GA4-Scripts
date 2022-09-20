@@ -24,6 +24,8 @@ function getSaveData() {
   gtag('config', 'G-0BQR1PRHYJ', {
     page_type: 'PAGE TYPE NAME', 
     effective_connection_type: getEffectiveConnectionType(),
-    save_data: getSaveData()
+    save_data: getSaveData(),
+    width: window.innerWidth||document.documentElement.clientWidth||document.body.clientWidth,
+    height: window.innerHeight||document.documentElement.clientHeight||document.body.clientHeight
  });
 </script>
