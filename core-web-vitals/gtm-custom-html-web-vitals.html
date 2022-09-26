@@ -1,12 +1,14 @@
 <script id="web-vitals-ga4">
 /*
  * Send Core Web Vitals to the DataLayer 
- * 
+ * v3.0
  */
 function sendToDataLayer(metric) {
 
   var rating = metric.rating;
   var attribution = metric.attribution;
+
+  var debug_target = attribution ? attribution.largestShiftTarget||attribution.element||attribution.eventTarget||'' : '(not set)';
 
   var webVitalsMeasurement =  {
     name: metric.name,
@@ -15,8 +17,9 @@ function sendToDataLayer(metric) {
     delta: metric.delta,
     rating: rating,
     valueRounded: Math.round(metric.name === 'CLS' ? metric.value * 1000 : metric.value),
-    deltaRounded: Math.round(metric.name === 'CLS' ? metric.value * 1000 : metric.value),
-    debug_target: attribution ? attribution.largestShiftTarget||attribution.element||attribution.eventTarget||'' : '(not set)' ,
+    deltaRounded: Math.round(metric.name === 'CLS' ? metric.delta * 1000 : metric.delta),
+    debug_target: debugTarget.substring(0,100),
+    debug_target2: debugTarget.substring(100),
     debug_event: attribution ? attribution.eventType||'' : '',
     debug_timing: attribution ? attribution.loadState||'' : '',
     event_time: attribution ? attribution.largestShiftTime||(attribution.lcpEntry&&attribution.lcpEntry.startTime)||attribution.eventTime||'': ''

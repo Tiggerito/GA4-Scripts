@@ -1,5 +1,5 @@
 # Replace target table name
-# Web Vitals Summary Materialised Table v3.0
+# Web Vitals Summary Materialised Table v3.1
 # https://github.com/Tiggerito/GA4-Scripts/blob/main/core-web-vitals/bigquery-materialize-table.sql
 CREATE OR REPLACE TABLE `your-project.analytics_123456789.web_vitals_summary`
   PARTITION BY DATE(event_timestamp)
@@ -45,7 +45,8 @@ FROM
             traffic_name,
             traffic_source,
             page_path,
-            debug_target,
+            # Tony's modification to support long debug_target
+            IF(debug_target2 IS NULL, debug_target, CONCAT(debug_target, debug_target2)) AS debug_target,
             event_timestamp,
             event_name,
             metric_id,
@@ -85,9 +86,14 @@ FROM
                 REGEXP_SUBSTR(
                   (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'page_location'),
                   r'^[^?]+')) AS page_path,
+              
               ANY_VALUE(
                 (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'debug_target'))
                 AS debug_target,
+                # Tony's modification to support long debug_target values (over 100 characters)
+              ANY_VALUE(
+                (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'debug_target2'))
+                AS debug_target2,
               ANY_VALUE(user_pseudo_id) AS user_pseudo_id,
               ANY_VALUE(geo.country) AS country,
               ANY_VALUE(event_name) AS event_name,
@@ -125,7 +131,7 @@ FROM
               # Replace source table name
               `your-project.analytics_123456789.events_*`
             WHERE
-              # Tony's modification to support TTFB and FCP
+              # Tony's modification to support TTFB and FCP and INP
               event_name IN ('LCP', 'FID', 'CLS', 'TTFB', 'FCP', 'INP', 'first_visit', 'purchase')
             GROUP BY
               1, 2
