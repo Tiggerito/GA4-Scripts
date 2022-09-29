@@ -1,7 +1,9 @@
-# Replace target table name
-# Web Vitals Summary Materialised Table v3.1
-# https://github.com/Tiggerito/GA4-Scripts/blob/main/core-web-vitals/bigquery-materialize-table.sql
-CREATE OR REPLACE TABLE `your-project.analytics_123456789.web_vitals_summary`
+# Web Vitals Materialised Table v3.2
+# https://github.com/Tiggerito/GA4-Scripts/blob/main/core-web-vitals/bigquery-materialize-table-web-vitals.sql
+
+# Replace all occurances of DatasetID with your Dataset ID
+
+CREATE OR REPLACE TABLE `DatasetID.web_vitals_summary` # Replace DatasetID with your Dataset ID
   PARTITION BY DATE(event_timestamp)
   CLUSTER BY metric_name
 AS
@@ -128,8 +130,7 @@ FROM
                 # Tony's additions 3 END
 
             FROM
-              # Replace source table name
-              `your-project.analytics_123456789.events_*`
+              `DatasetID.events_*` # Replace DatasetID with your Dataset ID
             WHERE
               # Tony's modification to support TTFB and FCP and INP
               event_name IN ('LCP', 'FID', 'CLS', 'TTFB', 'FCP', 'INP', 'first_visit', 'purchase')
