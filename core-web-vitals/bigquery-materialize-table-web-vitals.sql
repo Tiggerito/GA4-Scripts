@@ -1,4 +1,4 @@
-# Web Vitals Materialised Table v3.2
+# Web Vitals Materialised Table v3.3
 # https://github.com/Tiggerito/GA4-Scripts/blob/main/core-web-vitals/bigquery-materialize-table-web-vitals.sql
 
 # Replace all occurances of DatasetID with your Dataset ID
@@ -119,7 +119,7 @@ FROM
                 # Tony's additions 3 START
                 ANY_VALUE((SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'metric_rating')) AS metric_rating,
                 ANY_VALUE((SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'page_location')) AS page_location,
-                ANY_VALUE((SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'page_type')) AS page_type,
+                ANY_VALUE((SELECT COALESCE(value.string_value, CAST(value.int_value AS STRING)) FROM UNNEST(event_params) WHERE key = 'page_type')) AS page_type,
                 ANY_VALUE(geo.continent) AS continent,
                 ANY_VALUE(geo.region) AS region,
                 ANY_VALUE(device.web_info.browser) AS device_browser,

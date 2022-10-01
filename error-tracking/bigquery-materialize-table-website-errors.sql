@@ -1,5 +1,5 @@
 
-# Website Errors Materialised Table v3.0
+# Website Errors Materialised Table v3.1
 # https://github.com/Tiggerito/GA4-Scripts/blob/main/error-tracking/bigquery-materialize-table-website-errors.sql
 
 # Replace all occurances of DatasetID with your Dataset ID
@@ -19,7 +19,7 @@ SELECT
     device.operating_system AS device_operating_system,
     device.operating_system_version AS device_operating_system_version,
     (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'page_location') AS page_location,
-    (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'page_type') AS page_type,
+    (SELECT COALESCE(value.string_value, CAST(value.int_value AS STRING)) FROM UNNEST(event_params) WHERE key = 'page_type') AS page_type,
     (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'error_message') AS error_message,
     (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'error_type') AS error_type,
     (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'error_filename') AS error_filename,
