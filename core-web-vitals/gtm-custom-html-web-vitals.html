@@ -8,7 +8,7 @@ function sendToDataLayer(metric) {
   var rating = metric.rating;
   var attribution = metric.attribution;
 
-  var debug_target = attribution ? attribution.largestShiftTarget||attribution.element||attribution.eventTarget||'' : '(not set)';
+  var debugTarget = attribution ? attribution.largestShiftTarget||attribution.element||attribution.eventTarget||'' : '(not set)';
 
   var webVitalsMeasurement =  {
     name: metric.name,
@@ -37,7 +37,7 @@ function sendToDataLayer(metric) {
  * 
  * https://github.com/GoogleChrome/web-vitals#from-a-cdn
  * 
- * Modified to call the sendToGoogleAnalytics function on events
+ * Modified to call the sendToDataLayer function on events
  * 
  */
 (function() {
@@ -46,12 +46,12 @@ function sendToDataLayer(metric) {
   script.onload = function() {
     // When loading `web-vitals` using a classic script, all the public
     // methods can be found on the `webVitals` global namespace.
-    webVitals.onCLS(sendToGoogleAnalytics);
-    webVitals.onFID(sendToGoogleAnalytics);
-    webVitals.onLCP(sendToGoogleAnalytics);
-    webVitals.onFCP(sendToGoogleAnalytics);
-    webVitals.onTTFB(sendToGoogleAnalytics);
-    webVitals.onINP(sendToGoogleAnalytics);
+    webVitals.onCLS(sendToDataLayer);
+    webVitals.onFID(sendToDataLayer);
+    webVitals.onLCP(sendToDataLayer);
+    webVitals.onFCP(sendToDataLayer);
+    webVitals.onTTFB(sendToDataLayer);
+    webVitals.onINP(sendToDataLayer);
   }
   document.head.appendChild(script);
 }())

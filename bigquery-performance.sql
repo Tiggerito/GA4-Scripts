@@ -8,7 +8,7 @@ SELECT
 
     (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'save_data') AS save_data,
 
-    #(SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'page_type') AS page_type,
+    #(SELECT COALESCE(value.string_value, CAST(value.int_value AS STRING)) FROM UNNEST(event_params) WHERE key = 'page_type') AS page_type,
 
     (APPROX_QUANTILES((SELECT COALESCE(value.double_value, value.int_value) FROM UNNEST(event_params) WHERE key = 'fetchStart'), 100)[offset(75)]) AS fetchStart_p75,
     (APPROX_QUANTILES((SELECT COALESCE(value.double_value, value.int_value) FROM UNNEST(event_params) WHERE key = 'requestStart'), 100)[offset(75)]) AS requestStart_p75,

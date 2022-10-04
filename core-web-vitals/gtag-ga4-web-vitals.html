@@ -10,6 +10,9 @@
 function sendToGoogleAnalytics({name, delta, value, id, entries, rating, attribution}) {
   // Assumes the global `gtag()` function exists, see:
   // https://developers.google.com/analytics/devguides/collection/ga4
+
+  var debugTarget = attribution ? attribution.largestShiftTarget||attribution.element||attribution.eventTarget||'' : '(not set)';
+
   gtag('event', name, {
     // Built-in params:
     value: delta, // Use `delta` so the value can be summed.
@@ -23,7 +26,8 @@ function sendToGoogleAnalytics({name, delta, value, id, entries, rating, attribu
     // metric_rating: 'good' | 'needs-improvement' | 'poor'. 'needs-improvement' was 'ni'
     metric_rating: rating, //  not used by my report
     // debug_info
-    debug_target: attribution ? attribution.largestShiftTarget||attribution.element||attribution.eventTarget||'' : '(not set)' ,
+    debug_target: debugTarget.substring(0,100),
+    debug_target2: debugTarget.substring(100),
     debug_event: attribution ? attribution.eventType||'' : '',
     debug_timing: attribution ? attribution.loadState||'' : '',
     event_time: attribution ? attribution.largestShiftTime||(attribution.lcpEntry&&attribution.lcpEntry.startTime)||attribution.eventTime||'': ''
