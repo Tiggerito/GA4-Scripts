@@ -27,4 +27,5 @@ SELECT
     (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'error_colno') AS error_colno,
     (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'error_object_type') AS error_object_type
   FROM `DatasetID.events_*` # Replace DatasetID with your Dataset ID
-  WHERE event_name = 'exception'
+  WHERE event_name = 'exception';
+  

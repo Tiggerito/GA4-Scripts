@@ -19,4 +19,5 @@ SELECT
     (SELECT COALESCE(value.string_value, CAST(value.int_value AS STRING)) FROM UNNEST(event_params) WHERE key = 'page_type') AS page_type,
     (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'page_referrer') AS page_referrer,
   FROM `DatasetID.events_*` # Replace DatasetID with your Dataset ID
-  WHERE event_name = 'page_view'
+  WHERE event_name = 'page_view';
+  

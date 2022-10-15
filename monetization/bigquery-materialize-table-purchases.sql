@@ -56,4 +56,5 @@ FULL OUTER JOIN
   WHERE event_name = 'server_purchase'
   GROUP BY server_purchase_transaction_id
   )
-ON purchase_transaction_id = server_purchase_transaction_id
+ON purchase_transaction_id = server_purchase_transaction_id;
+
