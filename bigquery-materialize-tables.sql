@@ -1,5 +1,5 @@
-# Web Vitals Materialised Table v3.3
-# https://github.com/Tiggerito/GA4-Scripts/blob/main/core-web-vitals/bigquery-materialize-table-web-vitals.sql
+# Web Vitals Materialised Table for Tag Rocket v4.0
+# https://github.com/Tiggerito/GA4-Scripts/blob/main/core-web-vitals/bigquery-materialize-table-tag-rocket-web-vitals.sql
 
 # Replace all occurances of DatasetID with your Dataset ID
 
@@ -126,9 +126,9 @@ FROM
                 ANY_VALUE((SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'effective_connection_type')) AS effective_connection_type,
                 ANY_VALUE((SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'save_data')) AS save_data,
                 ANY_VALUE((SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'width')) AS width,
-                ANY_VALUE((SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'height')) AS height
+                ANY_VALUE((SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'height')) AS height,
+                TIMESTAMP_MICROS(ANY_VALUE((SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'page_timestamp'))) AS page_timestamp
                 # Tony's additions 3 END
-
             FROM
               `DatasetID.events_*` # Replace DatasetID with your Dataset ID
             WHERE
@@ -145,7 +145,7 @@ FROM
 CROSS JOIN UNNEST(events) AS evt
 WHERE evt.event_name NOT IN ('first_visit', 'purchase');
 
-# Purchases Materialised Table v3.0
+# Purchases Materialised Table v3.1
 # https://github.com/Tiggerito/GA4-Scripts/blob/main/monetization/bigquery-materialize-table-purchases.sql
 
 # Replace all occurances of DatasetID with your Dataset ID
@@ -159,9 +159,13 @@ SELECT
   DATE_TRUNC(IFNULL(purchase_event_timestamp, server_purchase_event_timestamp), DAY) AS event_date,
   purchase_event_timestamp,
   purchase_revenue,
+  purchase_shipping_value,
+  purchase_tax_value,
+  purchase_refund_value,
   purchase_events,
   server_purchase_event_timestamp,
   server_purchase_revenue,
+  server_purchase_method,
   server_purchase_events,
   device_browser,
   device_browser_version,
@@ -178,6 +182,9 @@ FROM
     TIMESTAMP_MICROS(ANY_VALUE(event_timestamp)) AS purchase_event_timestamp,
     ecommerce.transaction_id AS purchase_transaction_id,
     ANY_VALUE(ecommerce.purchase_revenue) AS purchase_revenue,
+    ANY_VALUE(ecommerce.shipping_value) AS purchase_shipping_value,
+    ANY_VALUE(ecommerce.tax_value) AS purchase_tax_value,
+    ANY_VALUE(ecommerce.refund_value) AS purchase_refund_value,
     COUNT(*) AS purchase_events,
     ANY_VALUE(device.web_info.browser) AS device_browser,
     ANY_VALUE(device.web_info.browser_version) AS device_browser_version,
@@ -198,6 +205,7 @@ FULL OUTER JOIN
     TIMESTAMP_MICROS(ANY_VALUE(event_timestamp)) AS server_purchase_event_timestamp,
     (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'transaction_id') AS server_purchase_transaction_id,
     ANY_VALUE((SELECT COALESCE(value.double_value, value.int_value) FROM UNNEST(event_params) WHERE key = 'value')) AS server_purchase_revenue,
+    (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'method') AS server_purchase_method,
     COUNT(*) AS server_purchase_events,
   FROM `DatasetID.events_*` # Replace DatasetID with your Dataset ID
   WHERE event_name = 'server_purchase'
