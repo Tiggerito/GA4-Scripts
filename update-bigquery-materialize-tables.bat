@@ -1,1 +1,1 @@
-type core-web-vitals\bigquery-materialize-table-web-vitals.sql monetization\bigquery-materialize-table-purchases.sql error-tracking\bigquery-materialize-table-website-errors.sql error-tracking\bigquery-materialize-table-missing-pages.sql > bigquery-materialize-tables.sql
+type core-web-vitals\bigquery-materialize-table-tag-rocket-web-vitals.sql monetization\bigquery-materialize-table-purchases.sql error-tracking\bigquery-materialize-table-website-errors.sql error-tracking\bigquery-materialize-table-missing-pages.sql > bigquery-materialize-tables.sql
