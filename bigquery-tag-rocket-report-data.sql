@@ -204,7 +204,7 @@ FULL OUTER JOIN
     TIMESTAMP_MICROS(ANY_VALUE(event_timestamp)) AS server_purchase_event_timestamp,
     (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'transaction_id') AS server_purchase_transaction_id,
     ANY_VALUE((SELECT COALESCE(value.double_value, value.int_value) FROM UNNEST(event_params) WHERE key = 'value')) AS server_purchase_revenue,
-    (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'method') AS server_purchase_method,
+    ANY_VALUE((SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'method')) AS server_purchase_method,
     COUNT(*) AS server_purchase_events,
   FROM `DatasetID.events_*` 
   WHERE event_name = 'server_purchase'
