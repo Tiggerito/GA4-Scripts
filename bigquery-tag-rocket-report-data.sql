@@ -20,7 +20,7 @@ SELECT
     AS session_engagement,
   evt.* EXCEPT (session_engaged, event_name),
   event_name AS metric_name,
-  FORMAT_TIMESTAMP('%Y%m%d', event_timestamp) AS event_date,
+#  FORMAT_TIMESTAMP('%Y%m%d', event_timestamp) AS event_date,
   
   # Tony's additions 1 START
   CASE metric_rating
@@ -52,6 +52,7 @@ FROM
             # Tony's modification to support long debug_target
             IF(debug_target2 IS NULL, debug_target, CONCAT(debug_target, debug_target2)) AS debug_target,
             event_timestamp,
+            event_date,
             event_name,
             metric_id,
             # Tony's modification to also support TTFB and FCP
@@ -111,6 +112,7 @@ FROM
                   WHERE key = 'session_engaged'
                 )) AS session_engaged,
               TIMESTAMP_MICROS(MAX(event_timestamp)) AS event_timestamp,
+              MAX(event_date) AS event_date,
               MAX(
                 (
                   SELECT COALESCE(value.double_value, value.int_value)
@@ -155,7 +157,7 @@ AS
 SELECT 
   IFNULL(purchase_transaction_id, server_purchase_transaction_id) AS transaction_id,
   IFNULL(purchase_event_timestamp, server_purchase_event_timestamp) AS event_timestamp,
-  DATE_TRUNC(IFNULL(purchase_event_timestamp, server_purchase_event_timestamp), DAY) AS event_date,
+  IFNULL(purchase_event_date, server_purchase_event_date) AS event_date,
   purchase_event_timestamp,
   purchase_revenue,
   purchase_shipping_value,
@@ -179,6 +181,7 @@ SELECT
 FROM
   (SELECT 
     TIMESTAMP_MICROS(ANY_VALUE(event_timestamp)) AS purchase_event_timestamp,
+    MAX(event_date) AS purchase_event_date,
     ecommerce.transaction_id AS purchase_transaction_id,
     ANY_VALUE(ecommerce.purchase_revenue) AS purchase_revenue,
     ANY_VALUE(ecommerce.shipping_value) AS purchase_shipping_value,
@@ -206,6 +209,7 @@ FULL OUTER JOIN
     ANY_VALUE((SELECT COALESCE(value.double_value, value.int_value) FROM UNNEST(event_params) WHERE key = 'value')) AS server_purchase_revenue,
     ANY_VALUE((SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'method')) AS server_purchase_method,
     COUNT(*) AS server_purchase_events,
+    MAX(event_date) AS server_purchase_event_date
   FROM `DatasetID.events_*` 
   WHERE event_name = 'server_purchase'
   GROUP BY server_purchase_transaction_id
@@ -220,7 +224,7 @@ CREATE OR REPLACE TABLE `DatasetID.website_errors`
 AS
 SELECT 
     TIMESTAMP_MICROS(event_timestamp) AS event_timestamp,
-    DATE_TRUNC(TIMESTAMP_MICROS(event_timestamp), DAY) AS event_date,
+    event_date,
     device.web_info.browser AS device_browser,
     device.web_info.browser_version AS device_browser_version,
     device.category AS device_category,
@@ -247,7 +251,7 @@ CREATE OR REPLACE TABLE `DatasetID.missing_pages`
 AS
 SELECT 
     TIMESTAMP_MICROS(event_timestamp) AS event_timestamp,
-    DATE_TRUNC(TIMESTAMP_MICROS(event_timestamp), DAY) AS event_date,
+    event_date,
     # traffic_source.medium AS traffic_medium, # user level
     # traffic_source.name AS traffic_name, # user level
     # traffic_source.source AS traffic_source, # user level

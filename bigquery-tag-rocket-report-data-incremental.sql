@@ -62,7 +62,7 @@ BEGIN
       width	INT64,			
       height	INT64,			
       metric_name	STRING,			
-      event_date	TIMESTAMP,			
+      event_date	STRING,			
       metric_status	STRING
     )
     PARTITION BY DATE(event_timestamp)
@@ -71,7 +71,7 @@ BEGIN
   END IF;
 
   # 10MB min per query makes this look expensive for small tables.
-  SET datetogather = (SELECT TIMESTAMP_TRUNC(TIMESTAMP_ADD(MAX(event_date), INTERVAL -2 DAY), DAY) FROM `DatasetID.web_vitals_summary_incremental`);
+  SET datetogather = (SELECT TIMESTAMP_TRUNC(TIMESTAMP_ADD(MAX(PARSE_TIMESTAMP("%Y%m%d",event_date)), INTERVAL -2 DAY), DAY) FROM `DatasetID.web_vitals_summary_incremental`);
 
   MERGE INTO `DatasetID.web_vitals_summary_incremental` A 
   USING (
@@ -86,7 +86,7 @@ BEGIN
         AS session_engagement,
       evt.* EXCEPT (session_engaged, event_name),
       event_name AS metric_name,
-      DATE_TRUNC(event_timestamp, DAY) AS event_date,
+   #   DATE_TRUNC(event_timestamp, DAY) AS event_date,
       
       # Tony's additions 1 START
       CASE metric_rating
@@ -121,6 +121,7 @@ BEGIN
                 # Tony's modification to support long debug_target
                 IF(debug_target2 IS NULL, debug_target, CONCAT(debug_target, debug_target2)) AS debug_target,
                 event_timestamp,
+                event_date,
                 event_name,
                 metric_id,
                 # Tony's modification to also support TTFB and FCP
@@ -184,6 +185,7 @@ BEGIN
                       WHERE key = 'session_engaged'
                     )) AS session_engaged,
                   TIMESTAMP_MICROS(MAX(event_timestamp)) AS event_timestamp,
+                  MAX(event_date) AS event_date,
                   MAX(
                     (
                       SELECT COALESCE(value.double_value, value.int_value)
@@ -324,7 +326,7 @@ BEGIN
       call_sequence INT64,
       transaction_id	STRING,			
       event_timestamp	TIMESTAMP,			
-      event_date	TIMESTAMP,			
+      event_date	STRING,			
       purchase_event_timestamp	TIMESTAMP,			
       purchase_revenue	FLOAT64,		
       purchase_shipping_value FLOAT64,		
@@ -352,7 +354,7 @@ BEGIN
   END IF;
 
   # 10MB min per query makes this look expensive for small tables.
-  SET datetogather = (SELECT TIMESTAMP_TRUNC(TIMESTAMP_ADD(MAX(event_date), INTERVAL -2 DAY), DAY) FROM `DatasetID.purchases_incremental`);
+  SET datetogather = (SELECT TIMESTAMP_TRUNC(TIMESTAMP_ADD(MAX(PARSE_TIMESTAMP("%Y%m%d",event_date)), INTERVAL -2 DAY), DAY) FROM `DatasetID.purchases_incremental`);
 
   MERGE INTO `DatasetID.purchases_incremental` A 
   USING (
@@ -362,7 +364,7 @@ BEGIN
       call_sequence,
       IFNULL(purchase_transaction_id, server_purchase_transaction_id) AS transaction_id,
       IFNULL(purchase_event_timestamp, server_purchase_event_timestamp) AS event_timestamp,
-      DATE_TRUNC(IFNULL(purchase_event_timestamp, server_purchase_event_timestamp), DAY) AS event_date,
+      IFNULL(purchase_event_date, server_purchase_event_date) AS event_date,
       purchase_event_timestamp,
       purchase_revenue,
       purchase_shipping_value,
@@ -389,6 +391,7 @@ BEGIN
         TIMESTAMP_MICROS(ANY_VALUE((SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'call_timestamp'))) AS call_timestamp,
         ANY_VALUE((SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'call_sequence')) AS call_sequence,
         TIMESTAMP_MICROS(ANY_VALUE(event_timestamp)) AS purchase_event_timestamp,
+        MAX(event_date) AS purchase_event_date,
         ecommerce.transaction_id AS purchase_transaction_id,
         ANY_VALUE(ecommerce.purchase_revenue) AS purchase_revenue,
         ANY_VALUE(ecommerce.shipping_value) AS purchase_shipping_value,
@@ -417,6 +420,7 @@ BEGIN
         ANY_VALUE((SELECT COALESCE(value.double_value, value.int_value) FROM UNNEST(event_params) WHERE key = 'value')) AS server_purchase_revenue,
         ANY_VALUE((SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'method')) AS server_purchase_method,
         COUNT(*) AS server_purchase_events,
+        MAX(event_date) AS server_purchase_event_date,
       FROM `DatasetID.events_*` 
       WHERE event_name = 'server_purchase'
       AND (datetogather IS NULL OR _table_suffix BETWEEN FORMAT_DATE('%Y%m%d',datetogather) AND FORMAT_DATE('%Y%m%d',DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY))) # can't match if they are on different days
@@ -515,7 +519,7 @@ BEGIN
       call_timestamp TIMESTAMP,
       call_sequence INT64,
       event_timestamp TIMESTAMP,
-      event_date	TIMESTAMP,
+      event_date	STRING,
       device_browser	STRING,
       device_browser_version	STRING,
       device_category	STRING,
@@ -544,7 +548,7 @@ BEGIN
   # original <12GB
 
   # 10MB min per query makes this look expensive for small tables.
-  SET datetogather = (SELECT TIMESTAMP_TRUNC(TIMESTAMP_ADD(MAX(event_date), INTERVAL -2 DAY), DAY) FROM `DatasetID.website_errors_incremental`);
+  SET datetogather = (SELECT TIMESTAMP_TRUNC(TIMESTAMP_ADD(MAX(PARSE_TIMESTAMP("%Y%m%d",event_date)), INTERVAL -2 DAY), DAY) FROM `DatasetID.website_errors_incremental`);
 
   MERGE INTO `DatasetID.website_errors_incremental` A 
   USING (
@@ -553,7 +557,7 @@ BEGIN
       TIMESTAMP_MICROS((SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'call_timestamp')) AS call_timestamp,
       (SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'call_sequence') AS call_sequence,
       TIMESTAMP_MICROS(event_timestamp) AS event_timestamp,
-      DATE_TRUNC(TIMESTAMP_MICROS(event_timestamp), DAY) AS event_date,
+      event_date,
       device.web_info.browser AS device_browser,
       device.web_info.browser_version AS device_browser_version,
       device.category AS device_category,
@@ -657,7 +661,7 @@ BEGIN
       call_timestamp TIMESTAMP,
       call_sequence INT64,
       event_timestamp TIMESTAMP,
-      event_date	TIMESTAMP,
+      event_date	STRING,
       source	STRING,
       medium	STRING,
       campaign	STRING,
@@ -670,7 +674,7 @@ BEGIN
     OPTIONS (description = 'Version 1.0');
   END IF;
 
-  SET datetogather = (SELECT TIMESTAMP_TRUNC(TIMESTAMP_ADD(MAX(event_date), INTERVAL -2 DAY), DAY) FROM `DatasetID.missing_pages_incremental`);
+  SET datetogather = (SELECT TIMESTAMP_TRUNC(TIMESTAMP_ADD(MAX(PARSE_TIMESTAMP("%Y%m%d",event_date)), INTERVAL -2 DAY), DAY) FROM `DatasetID.missing_pages_incremental`);
 
   MERGE INTO `DatasetID.missing_pages_incremental` A 
   USING (
@@ -679,7 +683,7 @@ BEGIN
       TIMESTAMP_MICROS((SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'call_timestamp')) AS call_timestamp,
       (SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'call_sequence') AS call_sequence,
       TIMESTAMP_MICROS(event_timestamp) AS event_timestamp,
-      DATE_TRUNC(TIMESTAMP_MICROS(event_timestamp), DAY) AS event_date,
+      event_date,
       # traffic_source.medium AS traffic_medium, # user level
       # traffic_source.name AS traffic_name, # user level
       # traffic_source.source AS traffic_source, # user level
