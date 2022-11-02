@@ -1,10 +1,17 @@
-# Website Errors Materialised Table Incremental v1.0
-# https://github.com/Tiggerito/GA4-Scripts/blob/main/error-tracking/bigquery-materialize-table-website-errors.sql
+# Tag Rocket Report Data Incremental v4.0
+# https://github.com/Tiggerito/GA4-Scripts/blob/main/bigquery-tag-rocket-report-data-incremental.sql
 
 # Replace all occurances of DatasetID with your Dataset ID
 
 BEGIN
   # The first run with gather all data. After that it will gather new data and merge the last 2 (or 3?) days of data
+
+  # new events can show up for up to 72 hours - 3 days
+  # https://support.google.com/analytics/answer/9358801
+  # https://support.google.com/analytics/answer/7029846
+  # implying only new events are added. events are not changed
+  # and typically only related to API events that can be late
+
 
   DECLARE datetogather DEFAULT CURRENT_TIMESTAMP();
 
@@ -23,7 +30,8 @@ BEGIN
   ) 
   THEN
     CREATE OR REPLACE TABLE `DatasetID.web_vitals_summary_incremental` (
-      last_updated TIMESTAMP,
+      created_timestamp TIMESTAMP,
+    #  last_updated TIMESTAMP,
       user_pseudo_id	STRING,
       call_timestamp TIMESTAMP,
       call_sequence INT64,
@@ -220,10 +228,11 @@ BEGIN
     AND A.event_timestamp = B.event_timestamp # backup
     AND A.metric_id = B.metric_id
   #  AND (datetogather IS NULL OR TIMESTAMP_TRUNC(B.event_timestamp, DAY) > datetogather)
-  #WHEN MATCHED THEN UPDATE SET  # what we gather should never change. 
-  #  A.last_updated = CURRENT_TIMESTAMP()
+ # WHEN MATCHED THEN UPDATE SET  
+ #   A.last_updated = CURRENT_TIMESTAMP(),
   WHEN NOT MATCHED THEN INSERT (
-    last_updated,
+    created_timestamp,
+  #  last_updated,
     user_pseudo_id,
     call_timestamp,
     call_sequence,
@@ -259,6 +268,7 @@ BEGIN
   )
   VALUES (
     CURRENT_TIMESTAMP(),
+  #  CURRENT_TIMESTAMP(),
     user_pseudo_id,
     call_timestamp,
     call_sequence,
@@ -307,6 +317,7 @@ BEGIN
   ) 
   THEN
     CREATE OR REPLACE TABLE `DatasetID.purchases_incremental` (
+      created_timestamp TIMESTAMP,
       last_updated TIMESTAMP,
       user_pseudo_id	STRING,
       call_timestamp TIMESTAMP,
@@ -396,7 +407,7 @@ BEGIN
         ANY_VALUE(user_ltv.currency) AS user_ltv_currency
       FROM `DatasetID.events_*` 
       WHERE event_name = 'purchase'
-      AND (datetogather IS NULL OR _table_suffix BETWEEN FORMAT_DATE('%Y%m%d',datetogather) AND FORMAT_DATE('%Y%m%d',DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY)))
+      AND (datetogather IS NULL OR _table_suffix BETWEEN FORMAT_DATE('%Y%m%d',datetogather) AND FORMAT_DATE('%Y%m%d',DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY))) # can't match if they are on different days
       GROUP BY purchase_transaction_id
       )
     FULL OUTER JOIN 
@@ -408,6 +419,7 @@ BEGIN
         COUNT(*) AS server_purchase_events,
       FROM `DatasetID.events_*` 
       WHERE event_name = 'server_purchase'
+      AND (datetogather IS NULL OR _table_suffix BETWEEN FORMAT_DATE('%Y%m%d',datetogather) AND FORMAT_DATE('%Y%m%d',DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY))) # can't match if they are on different days
       GROUP BY server_purchase_transaction_id
       )
     ON purchase_transaction_id = server_purchase_transaction_id
@@ -416,13 +428,13 @@ BEGIN
     ((A.user_pseudo_id IS NULL AND B.user_pseudo_id IS NULL) OR (A.user_pseudo_id = B.user_pseudo_id))
     AND ((A.call_timestamp IS NULL AND B.call_timestamp IS NULL) OR (A.call_timestamp = B.call_timestamp))
     AND ((A.call_sequence IS NULL AND B.call_sequence IS NULL) OR (A.call_sequence = B.call_sequence))
-    AND ((A.purchase_event_timestamp IS NULL AND B.purchase_event_timestamp IS NULL) OR (A.purchase_event_timestamp = B.purchase_event_timestamp))
-    AND ((A.server_purchase_event_timestamp IS NULL AND B.server_purchase_event_timestamp IS NULL) OR (A.server_purchase_event_timestamp = B.server_purchase_event_timestamp)) 
+    AND ((A.event_timestamp IS NULL AND B.event_timestamp IS NULL) OR (A.event_timestamp = B.event_timestamp)) 
     AND A.transaction_id = B.transaction_id 
   #  AND (datetogather IS NULL OR TIMESTAMP_TRUNC(B.event_timestamp, DAY) > datetogather)
-  #WHEN MATCHED THEN UPDATE SET  # what we gather should never change. 
-  #  A.last_updated = CURRENT_TIMESTAMP()
+  WHEN MATCHED THEN UPDATE SET  # what we gather should never change. 
+    A.last_updated = CURRENT_TIMESTAMP()
   WHEN NOT MATCHED THEN INSERT (
+    created_timestamp,
     last_updated,
     user_pseudo_id,
     call_timestamp,
@@ -452,6 +464,7 @@ BEGIN
     user_ltv_currency
   )
   VALUES (
+    CURRENT_TIMESTAMP(),
     CURRENT_TIMESTAMP(),
     user_pseudo_id,
     call_timestamp,
@@ -496,7 +509,8 @@ BEGIN
   ) 
   THEN
     CREATE OR REPLACE TABLE `DatasetID.website_errors_incremental` (
-      last_updated TIMESTAMP,
+      created_timestamp TIMESTAMP,
+    #  last_updated TIMESTAMP,
       user_pseudo_id	STRING,
       call_timestamp TIMESTAMP,
       call_sequence INT64,
@@ -572,7 +586,8 @@ BEGIN
   #WHEN MATCHED THEN UPDATE SET  # what we gather should never change. 
   #  A.last_updated = CURRENT_TIMESTAMP()
   WHEN NOT MATCHED THEN INSERT (
-    last_updated,
+    created_timestamp,
+  #  last_updated,
     user_pseudo_id,
     call_timestamp,
     call_sequence,
@@ -597,6 +612,7 @@ BEGIN
   )
   VALUES (
     CURRENT_TIMESTAMP(),
+  #  CURRENT_TIMESTAMP(),
     user_pseudo_id,
     call_timestamp,
     call_sequence,
@@ -635,7 +651,8 @@ BEGIN
   ) 
   THEN
     CREATE OR REPLACE TABLE `DatasetID.missing_pages_incremental` (
-      last_updated TIMESTAMP,
+      created_timestamp TIMESTAMP,
+    #  last_updated TIMESTAMP,
       user_pseudo_id	STRING,
       call_timestamp TIMESTAMP,
       call_sequence INT64,
@@ -683,10 +700,16 @@ BEGIN
     AND A.event_timestamp = B.event_timestamp # backup
     AND A.page_location = B.page_location # backup
   #  AND (datetogather IS NULL OR TIMESTAMP_TRUNC(B.event_timestamp, DAY) > datetogather)
-  #WHEN MATCHED THEN UPDATE SET  # what we gather should never change. 
-  #  A.last_updated = CURRENT_TIMESTAMP()
+  #WHEN MATCHED THEN UPDATE SET  
+   # A.last_updated = CURRENT_TIMESTAMP(),
+    # A.source = B.source,
+    # A.medium = B.medium,
+    # A.campaign = B.campaign,
+    # A.page_type = B.page_type,
+    # A.page_referrer = B.page_referrer
   WHEN NOT MATCHED THEN INSERT (
-    last_updated,
+    created_timestamp,
+  #  last_updated,
     user_pseudo_id,
     call_timestamp,
     call_sequence,
@@ -701,6 +724,7 @@ BEGIN
   )
   VALUES (
     CURRENT_TIMESTAMP(),
+  #  CURRENT_TIMESTAMP(),
     user_pseudo_id,
     call_timestamp,
     call_sequence,
