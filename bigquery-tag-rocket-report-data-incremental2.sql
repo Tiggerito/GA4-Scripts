@@ -1,11 +1,10 @@
-# Tag Rocket Report Data Incremental2 v4.0
-# https://github.com/Tiggerito/GA4-Scripts/blob/main/bigquery-tag-rocket-report-data-incremental.sql
+# Tag Rocket Report Data Incremental 2 v4.0
+# https://github.com/Tiggerito/GA4-Scripts/blob/main/bigquery-tag-rocket-report-data-incremental2.sql
 
 # Replace all occurances of DatasetID with your Dataset ID
 
 BEGIN
-  # The first run with gather all data. After that it will gather new data and merge the last 2 (or 3?) days of data
-
+  # The first run with gather all data. After that it will gather new data and merge the last 3 days of data
 
   # 60 days
 
@@ -33,12 +32,12 @@ BEGIN
     FROM
       `DatasetID.INFORMATION_SCHEMA.TABLE_OPTIONS`
     WHERE
-      table_name = 'web_vitals_summary_incremental2'
+      table_name = 'web_vitals_summary'
       AND option_name = 'description'
-      AND option_value LIKE "%Version 1.0%"
+      AND option_value LIKE "%Version 4.0%"
   ) 
   THEN
-    CREATE OR REPLACE TABLE `DatasetID.web_vitals_summary_incremental2` (
+    CREATE OR REPLACE TABLE `DatasetID.web_vitals_summary` (
       last_updated TIMESTAMP,
       user_pseudo_id	STRING,
       call_timestamp TIMESTAMP,
@@ -75,17 +74,17 @@ BEGIN
     )
     PARTITION BY DATE(event_timestamp)
     CLUSTER BY metric_name
-    OPTIONS (description = 'Version 1.0'); 
+    OPTIONS (description = 'Version 4.0'); 
   END IF;
 
   # 10MB min per query makes this look expensive for small tables.
-  SET datetogather = (SELECT TIMESTAMP_TRUNC(TIMESTAMP_ADD(MAX(PARSE_TIMESTAMP("%Y%m%d",event_date)), INTERVAL -2 DAY), DAY) FROM `DatasetID.web_vitals_summary_incremental2`);
+  SET datetogather = (SELECT TIMESTAMP_TRUNC(TIMESTAMP_ADD(MAX(PARSE_TIMESTAMP("%Y%m%d",event_date)), INTERVAL -2 DAY), DAY) FROM `DatasetID.web_vitals_summary`);
 
   IF datetogather IS NOT NULL THEN
-  DELETE FROM `DatasetID.web_vitals_summary_incremental2` WHERE PARSE_TIMESTAMP("%Y%m%d",event_date) >= datetogather;
+  DELETE FROM `DatasetID.web_vitals_summary` WHERE PARSE_TIMESTAMP("%Y%m%d",event_date) >= datetogather;
   END IF;
 
-  INSERT `DatasetID.web_vitals_summary_incremental2` 
+  INSERT `DatasetID.web_vitals_summary` 
   (    
     last_updated,
     ga_session_id,
@@ -280,12 +279,12 @@ BEGIN
     FROM
       `DatasetID.INFORMATION_SCHEMA.TABLE_OPTIONS`
     WHERE
-      table_name = 'purchases_incremental2'
+      table_name = 'purchases'
       AND option_name = 'description'
-      AND option_value LIKE "%Version 1.0%"
+      AND option_value LIKE "%Version 4.0%"
   ) 
   THEN
-    CREATE OR REPLACE TABLE `DatasetID.purchases_incremental2` (
+    CREATE OR REPLACE TABLE `DatasetID.purchases` (
       last_updated TIMESTAMP,
       user_pseudo_id	STRING,
       call_timestamp TIMESTAMP,
@@ -316,17 +315,17 @@ BEGIN
     )
     # or maybe month? each partition should be 1GB https://medium.com/dataseries/costs-and-performance-lessons-after-using-bigquery-with-terabytes-of-data-54a5809ac912
     PARTITION BY TIMESTAMP_TRUNC(event_timestamp, DAY)
-    OPTIONS (description = 'Version 1.0'); 
+    OPTIONS (description = 'Version 4.0'); 
   END IF;
 
   # 10MB min per query makes this look expensive for small tables.
-  SET datetogather = (SELECT TIMESTAMP_TRUNC(TIMESTAMP_ADD(MAX(PARSE_TIMESTAMP("%Y%m%d",event_date)), INTERVAL -2 DAY), DAY) FROM `DatasetID.purchases_incremental2`);
+  SET datetogather = (SELECT TIMESTAMP_TRUNC(TIMESTAMP_ADD(MAX(PARSE_TIMESTAMP("%Y%m%d",event_date)), INTERVAL -2 DAY), DAY) FROM `DatasetID.purchases`);
 
   IF datetogather IS NOT NULL THEN
-  DELETE FROM `DatasetID.purchases_incremental2` WHERE PARSE_TIMESTAMP("%Y%m%d",event_date) >= datetogather;
+  DELETE FROM `DatasetID.purchases` WHERE PARSE_TIMESTAMP("%Y%m%d",event_date) >= datetogather;
   END IF;
 
- INSERT `DatasetID.purchases_incremental2`  
+ INSERT `DatasetID.purchases`  
   (
       last_updated,
       user_pseudo_id,
@@ -437,12 +436,12 @@ BEGIN
     FROM
       `DatasetID.INFORMATION_SCHEMA.TABLE_OPTIONS`
     WHERE
-      table_name = 'website_errors_incremental2'
+      table_name = 'website_errors'
       AND option_name = 'description'
-      AND option_value LIKE "%Version 1.0%"
+      AND option_value LIKE "%Version 4.0%"
   ) 
   THEN
-    CREATE OR REPLACE TABLE `DatasetID.website_errors_incremental2` (
+    CREATE OR REPLACE TABLE `DatasetID.website_errors` (
       last_updated TIMESTAMP,
       user_pseudo_id	STRING,
       call_timestamp TIMESTAMP,
@@ -468,18 +467,18 @@ BEGIN
     )
     # or maybe month? each partition should be 1GB https://medium.com/dataseries/costs-and-performance-lessons-after-using-bigquery-with-terabytes-of-data-54a5809ac912
     PARTITION BY TIMESTAMP_TRUNC(event_timestamp, DAY)
-    OPTIONS (description = 'Version 1.0'); 
+    OPTIONS (description = 'Version 4.0'); 
   END IF;
 
 
   # 10MB min per query makes this look expensive for small tables.
-  SET datetogather = (SELECT TIMESTAMP_TRUNC(TIMESTAMP_ADD(MAX(PARSE_TIMESTAMP("%Y%m%d",event_date)), INTERVAL -2 DAY), DAY) FROM `DatasetID.website_errors_incremental2`);
+  SET datetogather = (SELECT TIMESTAMP_TRUNC(TIMESTAMP_ADD(MAX(PARSE_TIMESTAMP("%Y%m%d",event_date)), INTERVAL -2 DAY), DAY) FROM `DatasetID.website_errors`);
 
   IF datetogather IS NOT NULL THEN
-  DELETE FROM `DatasetID.website_errors_incremental2` WHERE PARSE_TIMESTAMP("%Y%m%d",event_date) >= datetogather;
+  DELETE FROM `DatasetID.website_errors` WHERE PARSE_TIMESTAMP("%Y%m%d",event_date) >= datetogather;
   END IF;
 
-  INSERT `DatasetID.website_errors_incremental2` 
+  INSERT `DatasetID.website_errors` 
   (
     last_updated,
     user_pseudo_id,
@@ -541,12 +540,12 @@ BEGIN
     FROM
       `DatasetID.INFORMATION_SCHEMA.TABLE_OPTIONS`
     WHERE
-      table_name = 'missing_pages_incremental2'
+      table_name = 'missing_pages'
       AND option_name = 'description'
-      AND option_value LIKE "%Version 1.0%"
+      AND option_value LIKE "%Version 4.0%"
   ) 
   THEN
-    CREATE OR REPLACE TABLE `DatasetID.missing_pages_incremental2` (
+    CREATE OR REPLACE TABLE `DatasetID.missing_pages` (
       last_updated TIMESTAMP,
       user_pseudo_id	STRING,
       call_timestamp TIMESTAMP,
@@ -562,16 +561,16 @@ BEGIN
     )
     # or maybe month? each partition should be 1GB https://medium.com/dataseries/costs-and-performance-lessons-after-using-bigquery-with-terabytes-of-data-54a5809ac912
     PARTITION BY TIMESTAMP_TRUNC(event_timestamp, DAY)
-    OPTIONS (description = 'Version 1.0');
+    OPTIONS (description = 'Version 4.0');
   END IF;
 
-  SET datetogather = (SELECT TIMESTAMP_TRUNC(TIMESTAMP_ADD(MAX(PARSE_TIMESTAMP("%Y%m%d",event_date)), INTERVAL -2 DAY), DAY) FROM `DatasetID.missing_pages_incremental2`);
+  SET datetogather = (SELECT TIMESTAMP_TRUNC(TIMESTAMP_ADD(MAX(PARSE_TIMESTAMP("%Y%m%d",event_date)), INTERVAL -2 DAY), DAY) FROM `DatasetID.missing_pages`);
 
   IF datetogather IS NOT NULL THEN
-  DELETE FROM `DatasetID.missing_pages_incremental2` WHERE PARSE_TIMESTAMP("%Y%m%d",event_date) >= datetogather;
+  DELETE FROM `DatasetID.missing_pages` WHERE PARSE_TIMESTAMP("%Y%m%d",event_date) >= datetogather;
   END IF;
 
-  INSERT `DatasetID.missing_pages_incremental2` 
+  INSERT `DatasetID.missing_pages` 
   (
     last_updated,
     user_pseudo_id,
