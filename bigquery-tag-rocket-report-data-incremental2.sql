@@ -19,7 +19,7 @@ BEGIN
     '' AS scheduled_by, # e.g. "BigQuery"
     '' AS notification, # will show as a notification in the report
     '' AS last_exported_date, # set when using Tag Rocket to run the query
-    version AS query_version
+    version AS query_version,
     CURRENT_TIMESTAMP() AS last_run_timestamp
   ));
 
