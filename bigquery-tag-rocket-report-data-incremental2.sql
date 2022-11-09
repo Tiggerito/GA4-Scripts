@@ -6,15 +6,20 @@
 BEGIN
   # The first run with gather all data. After that it will gather new data and merge the last 3 days of data
 
+  DECLARE version DEFAULT "4.0";
+
   DECLARE datetogather DEFAULT CURRENT_TIMESTAMP();
   
   CREATE OR REPLACE TABLE DatasetID.tag_rocket 
   AS
   SELECT * FROM (SELECT AS VALUE STRUCT(
-    '4.0' AS query_version, 
-    '' AS last_event_table_processed, 
     '' AS store_front_name,
     '' AS store_front_url,
+    '' AS schedule, # how frequently the query is scheduled to run. e.g. "weekly", "every Monday"
+    '' AS scheduled_by, # e.g. "BigQuery"
+    '' AS notification, # will show as a notification in the report
+    '' AS last_exported_date, # set when using Tag Rocket to run the query
+    version AS query_version
     CURRENT_TIMESTAMP() AS last_run_timestamp
   ));
 
@@ -269,7 +274,7 @@ BEGIN
               WHERE
                 # Tony's modification to support TTFB and FCP and INP
                 event_name IN ('LCP', 'FID', 'CLS', 'TTFB', 'FCP', 'INP', 'first_visit', 'purchase')
-                AND (datetogather IS NULL OR _table_suffix BETWEEN FORMAT_DATE('%Y%m%d',DATE_SUB(datetogather, INTERVAL 1 DAY)) AND FORMAT_DATE('%Y%m%d',CURRENT_DATE()))
+                AND (datetogather IS NULL OR _table_suffix BETWEEN FORMAT_DATE('%Y%m%d',DATE_SUB(datetogather, INTERVAL 1 DAY)) AND FORMAT_DATE('%Y%m%d',CURRENT_DATE())) # one more day than datetogather so we get cross midnight joins working. 
               GROUP BY
                 1, 2
             )
@@ -420,7 +425,7 @@ BEGIN
       ANY_VALUE(user_ltv.currency) AS user_ltv_currency
     FROM `DatasetID.events_*` 
     WHERE event_name = 'purchase'
-    AND (datetogather IS NULL OR _table_suffix BETWEEN FORMAT_DATE('%Y%m%d',DATE_SUB(datetogather, INTERVAL 1 DAY)) AND FORMAT_DATE('%Y%m%d',CURRENT_DATE())) # can't match if they are on different days
+    AND (datetogather IS NULL OR _table_suffix BETWEEN FORMAT_DATE('%Y%m%d',DATE_SUB(datetogather, INTERVAL 1 DAY)) AND FORMAT_DATE('%Y%m%d',CURRENT_DATE())) # one more day than datetogather so we get cross midnight joins working. 
     GROUP BY purchase_transaction_id
     )
   FULL OUTER JOIN 
@@ -433,7 +438,7 @@ BEGIN
       MAX(event_date) AS server_purchase_event_date,
     FROM `DatasetID.events_*` 
     WHERE event_name = 'server_purchase'
-    AND (datetogather IS NULL OR _table_suffix BETWEEN FORMAT_DATE('%Y%m%d',DATE_SUB(datetogather, INTERVAL 1 DAY)) AND FORMAT_DATE('%Y%m%d',CURRENT_DATE())) # can't match if they are on different days
+    AND (datetogather IS NULL OR _table_suffix BETWEEN FORMAT_DATE('%Y%m%d',DATE_SUB(datetogather, INTERVAL 1 DAY)) AND FORMAT_DATE('%Y%m%d',CURRENT_DATE())) # one more day than datetogather so we get cross midnight joins working. 
     GROUP BY server_purchase_transaction_id
     )
   ON purchase_transaction_id = server_purchase_transaction_id
