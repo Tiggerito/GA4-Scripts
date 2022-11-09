@@ -15,7 +15,7 @@ BEGIN
   SELECT * FROM (SELECT AS VALUE STRUCT(
     '' AS store_front_name,
     '' AS store_front_url,
-    '' AS schedule, # how frequently the query is scheduled to run. e.g. "weekly", "every Monday"
+    '' AS schedule_frequency, # how frequently the query is scheduled to run. e.g. "weekly", "every Monday"
     '' AS scheduled_by, # e.g. "BigQuery"
     '' AS notification, # will show as a notification in the report
     '' AS last_exported_date, # set when using Tag Rocket to run the query
