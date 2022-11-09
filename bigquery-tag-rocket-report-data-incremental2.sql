@@ -6,6 +6,8 @@
 BEGIN
   # The first run with gather all data. After that it will gather new data and merge the last 3 days of data
 
+  DECLARE datetogather DEFAULT CURRENT_TIMESTAMP();
+  
   CREATE OR REPLACE TABLE DatasetID.tag_rocket 
   AS
   SELECT * FROM (SELECT AS VALUE STRUCT(
@@ -31,7 +33,7 @@ BEGIN
 
   # original 48GB every time
 
-  DECLARE datetogather DEFAULT CURRENT_TIMESTAMP();
+
 
   # Web Vitals
 
