@@ -6,6 +6,16 @@
 BEGIN
   # The first run with gather all data. After that it will gather new data and merge the last 3 days of data
 
+  CREATE OR REPLACE TABLE DatasetID.tag_rocket 
+  AS
+  SELECT * FROM (SELECT AS VALUE STRUCT(
+    '4.0' AS query_version, 
+    '' AS last_event_table_processed, 
+    '' AS store_front_name,
+    '' AS store_front_url,
+    CURRENT_TIMESTAMP() AS last_run_timestamp
+  ))
+
   # 60 days
 
   # Incremental 2
