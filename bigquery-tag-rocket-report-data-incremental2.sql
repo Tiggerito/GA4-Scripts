@@ -14,7 +14,7 @@ BEGIN
     '' AS store_front_name,
     '' AS store_front_url,
     CURRENT_TIMESTAMP() AS last_run_timestamp
-  ))
+  ));
 
   # 60 days
 
