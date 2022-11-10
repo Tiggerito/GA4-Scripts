@@ -8,6 +8,14 @@ BEGIN
 
   DECLARE version DEFAULT "4.0";
 
+  # this means lookbackDays+1 days of GA4 export data are processed each time. 
+  # GA4 states they add events that happen 72 hours after the fact, and then re-export the relevant days table 
+  # 2+1=3 days should capture most late processed events.
+  # The queries look back based on the last day that had been processed, so there should be no issues if the GA4 export gets delayed.
+  # If you are reaching your monthly free limit you could reduce the lookback at the risk of losing a bit of data
+  # If you have plenty of alowance you could increase it. Probably no need to go beyond lookbackDays being 3 or 4.
+  DECLARE lookbackDays DEFAULT 2; 
+
   DECLARE datetogather DEFAULT CURRENT_TIMESTAMP();
   
   CREATE OR REPLACE TABLE DatasetID.tag_rocket 
@@ -95,7 +103,7 @@ BEGIN
   END IF;
 
   # 10MB min per query makes this look expensive for small tables.
-  SET datetogather = (SELECT TIMESTAMP_TRUNC(TIMESTAMP_ADD(MAX(PARSE_TIMESTAMP("%Y%m%d",event_date)), INTERVAL -2 DAY), DAY) FROM `DatasetID.web_vitals_summary`);
+  SET datetogather = (SELECT TIMESTAMP_TRUNC(TIMESTAMP_ADD(MAX(PARSE_TIMESTAMP("%Y%m%d",event_date)), INTERVAL -lookbackDays DAY), DAY) FROM `DatasetID.web_vitals_summary`);
 
   IF datetogather IS NOT NULL THEN
   DELETE FROM `DatasetID.web_vitals_summary` WHERE PARSE_TIMESTAMP("%Y%m%d",event_date) >= datetogather;
@@ -336,7 +344,7 @@ BEGIN
   END IF;
 
   # 10MB min per query makes this look expensive for small tables.
-  SET datetogather = (SELECT TIMESTAMP_TRUNC(TIMESTAMP_ADD(MAX(PARSE_TIMESTAMP("%Y%m%d",event_date)), INTERVAL -2 DAY), DAY) FROM `DatasetID.purchases`);
+  SET datetogather = (SELECT TIMESTAMP_TRUNC(TIMESTAMP_ADD(MAX(PARSE_TIMESTAMP("%Y%m%d",event_date)), INTERVAL -lookbackDays DAY), DAY) FROM `DatasetID.purchases`);
 
   IF datetogather IS NOT NULL THEN
   DELETE FROM `DatasetID.purchases` WHERE PARSE_TIMESTAMP("%Y%m%d",event_date) >= datetogather;
@@ -489,7 +497,7 @@ BEGIN
 
 
   # 10MB min per query makes this look expensive for small tables.
-  SET datetogather = (SELECT TIMESTAMP_TRUNC(TIMESTAMP_ADD(MAX(PARSE_TIMESTAMP("%Y%m%d",event_date)), INTERVAL -2 DAY), DAY) FROM `DatasetID.website_errors`);
+  SET datetogather = (SELECT TIMESTAMP_TRUNC(TIMESTAMP_ADD(MAX(PARSE_TIMESTAMP("%Y%m%d",event_date)), INTERVAL -lookbackDays DAY), DAY) FROM `DatasetID.website_errors`);
 
   IF datetogather IS NOT NULL THEN
   DELETE FROM `DatasetID.website_errors` WHERE PARSE_TIMESTAMP("%Y%m%d",event_date) >= datetogather;
@@ -581,7 +589,7 @@ BEGIN
     OPTIONS (description = 'Version 4.0');
   END IF;
 
-  SET datetogather = (SELECT TIMESTAMP_TRUNC(TIMESTAMP_ADD(MAX(PARSE_TIMESTAMP("%Y%m%d",event_date)), INTERVAL -2 DAY), DAY) FROM `DatasetID.missing_pages`);
+  SET datetogather = (SELECT TIMESTAMP_TRUNC(TIMESTAMP_ADD(MAX(PARSE_TIMESTAMP("%Y%m%d",event_date)), INTERVAL -lookbackDays DAY), DAY) FROM `DatasetID.missing_pages`);
 
   IF datetogather IS NOT NULL THEN
   DELETE FROM `DatasetID.missing_pages` WHERE PARSE_TIMESTAMP("%Y%m%d",event_date) >= datetogather;
