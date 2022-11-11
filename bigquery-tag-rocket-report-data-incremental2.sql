@@ -16,15 +16,17 @@ BEGIN
   # If you have plenty of alowance you could increase it. Probably no need to go beyond lookbackDays being 3 or 4.
   DECLARE lookbackDays DEFAULT 2; 
 
+  DECLARE maxDaysToLookBackOnInitialQuery DEFAULT 32; # two extra days from today to cover the delay in GA4 exporting data 
+
   DECLARE datetogather DEFAULT CURRENT_TIMESTAMP();
   
-  CREATE OR REPLACE TABLE DatasetID.tag_rocket 
+  CREATE OR REPLACE TABLE web-site-advantage-ga4.analytics_327863596.tag_rocket 
   AS
   SELECT * FROM (SELECT AS VALUE STRUCT(
+    '' AS schedule_frequency, # how frequently the query is scheduled to run. e.g. "monthly", "every Monday", "manually"
+    '' AS scheduled_by, # e.g. "BigQuery"
     '' AS store_front_name,
     '' AS store_front_url,
-    '' AS schedule_frequency, # how frequently the query is scheduled to run. e.g. "weekly", "every Monday"
-    '' AS scheduled_by, # e.g. "BigQuery"
     '' AS notification, # will show as a notification in the report
     '' AS last_exported_date, # set when using Tag Rocket to run the query
     version AS query_version,
@@ -106,8 +108,12 @@ BEGIN
   SET datetogather = (SELECT TIMESTAMP_TRUNC(TIMESTAMP_ADD(MAX(PARSE_TIMESTAMP("%Y%m%d",event_date)), INTERVAL -lookbackDays DAY), DAY) FROM `DatasetID.web_vitals_summary`);
 
   IF datetogather IS NOT NULL THEN
-  DELETE FROM `DatasetID.web_vitals_summary` WHERE PARSE_TIMESTAMP("%Y%m%d",event_date) >= datetogather;
+    DELETE FROM `DatasetID.web_vitals_summary` WHERE PARSE_TIMESTAMP("%Y%m%d",event_date) >= datetogather;
+  ELSE
+    SET datetogather = TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL maxDaysToLookBackOnInitialQuery DAY);
   END IF;
+
+  
 
   INSERT `DatasetID.web_vitals_summary` 
   (    
@@ -157,9 +163,7 @@ BEGIN
       AS session_engagement,
     evt.* EXCEPT (session_engaged, event_name),
     event_name AS metric_name,
-    #DATE_TRUNC(event_timestamp, DAY) AS event_date,
-    
-    # Tony's additions 1 START
+  
     CASE metric_rating
       WHEN 'good' THEN 'Good'
       WHEN 'ni' THEN 'Needs Improvement'
@@ -167,7 +171,6 @@ BEGIN
       WHEN 'poor' THEN 'Poor'
       ELSE metric_rating
     END AS metric_status
-    # Tony's additions 1 END
 
   FROM
     (
@@ -189,19 +192,15 @@ BEGIN
               traffic_name,
               traffic_source,
               page_path,
-              # Tony's modification to support long debug_target
               IF(debug_target2 IS NULL, debug_target, CONCAT(debug_target, debug_target2)) AS debug_target,
               event_timestamp,
               event_date,
               event_name,
               metric_id,
-              # Tony's modification to also support TTFB and FCP
               IF(event_name = 'LCP' OR event_name = 'TTFB' OR event_name = 'FCP', metric_value / 1000, metric_value) AS metric_value,
               user_pseudo_id,
               session_engaged,
               session_revenue,
-
-              # Tony's additions 2 START
               metric_rating,
               page_location,
               page_type,
@@ -212,8 +211,6 @@ BEGIN
               save_data,
               width,
               height
-              # Tony's additions 2 END
-
               ) AS custom_event
           FROM
             (
@@ -223,9 +220,9 @@ BEGIN
                 (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'metric_id')
                   AS metric_id,
 
-                TIMESTAMP_MICROS(ANY_VALUE((SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'call_timestamp'))) AS call_timestamp,
+                SAFE.TIMESTAMP_MICROS(ANY_VALUE((SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'call_timestamp'))) AS call_timestamp,
                 ANY_VALUE((SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'call_sequence')) AS call_sequence,
-                TIMESTAMP_MICROS(ANY_VALUE((SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'page_timestamp'))) AS page_timestamp,
+                SAFE.TIMESTAMP_MICROS(ANY_VALUE((SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'page_timestamp'))) AS page_timestamp,
                 ANY_VALUE(device.category) AS device_category,
                 ANY_VALUE(device.operating_system) AS device_os,
                 ANY_VALUE(traffic_source.medium) AS traffic_medium,
@@ -239,7 +236,6 @@ BEGIN
                 ANY_VALUE(
                   (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'debug_target'))
                   AS debug_target,
-                  # Tony's modification to support long debug_target values (over 100 characters)
                 ANY_VALUE(
                   (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'debug_target2'))
                   AS debug_target2,
@@ -255,7 +251,7 @@ BEGIN
                     FROM UNNEST(event_params)
                     WHERE key = 'session_engaged'
                   )) AS session_engaged,
-                TIMESTAMP_MICROS(MAX(event_timestamp)) AS event_timestamp,
+                SAFE.TIMESTAMP_MICROS(MAX(event_timestamp)) AS event_timestamp,
                 MAX(event_date) AS event_date,
                 MAX(
                   (
@@ -264,7 +260,7 @@ BEGIN
                     WHERE key = 'metric_value'
                   )) AS metric_value,
 
-                  # Tony's additions 3 START
+
                   ANY_VALUE((SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'metric_rating')) AS metric_rating,
                   ANY_VALUE((SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'page_location')) AS page_location,
                   ANY_VALUE((SELECT COALESCE(value.string_value, CAST(value.int_value AS STRING)) FROM UNNEST(event_params) WHERE key = 'page_type')) AS page_type,
@@ -275,14 +271,12 @@ BEGIN
                   ANY_VALUE((SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'save_data')) AS save_data,
                   ANY_VALUE((SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'width')) AS width,
                   ANY_VALUE((SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'height')) AS height
-
-                  # Tony's additions 3 END
               FROM
                 `DatasetID.events_*`
               WHERE
-                # Tony's modification to support TTFB and FCP and INP
                 event_name IN ('LCP', 'FID', 'CLS', 'TTFB', 'FCP', 'INP', 'first_visit', 'purchase')
-                AND (datetogather IS NULL OR _table_suffix BETWEEN FORMAT_DATE('%Y%m%d',DATE_SUB(datetogather, INTERVAL 1 DAY)) AND FORMAT_DATE('%Y%m%d',CURRENT_DATE())) # one more day than datetogather so we get cross midnight joins working. 
+                # Gather one more day than datetogather so we get cross midnight joins working
+                AND (datetogather IS NULL OR _table_suffix BETWEEN FORMAT_DATE('%Y%m%d',DATE_SUB(datetogather, INTERVAL 1 DAY)) AND FORMAT_DATE('%Y%m%d',CURRENT_DATE()))                  
               GROUP BY
                 1, 2
             )
@@ -347,7 +341,9 @@ BEGIN
   SET datetogather = (SELECT TIMESTAMP_TRUNC(TIMESTAMP_ADD(MAX(PARSE_TIMESTAMP("%Y%m%d",event_date)), INTERVAL -lookbackDays DAY), DAY) FROM `DatasetID.purchases`);
 
   IF datetogather IS NOT NULL THEN
-  DELETE FROM `DatasetID.purchases` WHERE PARSE_TIMESTAMP("%Y%m%d",event_date) >= datetogather;
+    DELETE FROM `DatasetID.purchases` WHERE PARSE_TIMESTAMP("%Y%m%d",event_date) >= datetogather;
+  ELSE
+    SET datetogather = TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL maxDaysToLookBackOnInitialQuery DAY);
   END IF;
 
  INSERT `DatasetID.purchases`  
@@ -411,9 +407,9 @@ BEGIN
   FROM
     (SELECT 
       ANY_VALUE(user_pseudo_id) AS user_pseudo_id,
-      TIMESTAMP_MICROS(ANY_VALUE((SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'call_timestamp'))) AS call_timestamp,
+      SAFE.TIMESTAMP_MICROS(ANY_VALUE((SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'call_timestamp'))) AS call_timestamp,
       ANY_VALUE((SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'call_sequence')) AS call_sequence,
-      TIMESTAMP_MICROS(ANY_VALUE(event_timestamp)) AS purchase_event_timestamp,
+      SAFE.TIMESTAMP_MICROS(ANY_VALUE(event_timestamp)) AS purchase_event_timestamp,
       MAX(event_date) AS purchase_event_date,
       ecommerce.transaction_id AS purchase_transaction_id,
       ANY_VALUE(ecommerce.purchase_revenue) AS purchase_revenue,
@@ -438,7 +434,7 @@ BEGIN
     )
   FULL OUTER JOIN 
     (SELECT 
-      TIMESTAMP_MICROS(ANY_VALUE(event_timestamp)) AS server_purchase_event_timestamp,
+      SAFE.TIMESTAMP_MICROS(ANY_VALUE(event_timestamp)) AS server_purchase_event_timestamp,
       (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'transaction_id') AS server_purchase_transaction_id,
       ANY_VALUE((SELECT COALESCE(value.double_value, value.int_value) FROM UNNEST(event_params) WHERE key = 'value')) AS server_purchase_revenue,
       ANY_VALUE((SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'method')) AS server_purchase_method,
@@ -500,7 +496,9 @@ BEGIN
   SET datetogather = (SELECT TIMESTAMP_TRUNC(TIMESTAMP_ADD(MAX(PARSE_TIMESTAMP("%Y%m%d",event_date)), INTERVAL -lookbackDays DAY), DAY) FROM `DatasetID.website_errors`);
 
   IF datetogather IS NOT NULL THEN
-  DELETE FROM `DatasetID.website_errors` WHERE PARSE_TIMESTAMP("%Y%m%d",event_date) >= datetogather;
+    DELETE FROM `DatasetID.website_errors` WHERE PARSE_TIMESTAMP("%Y%m%d",event_date) >= datetogather;
+  ELSE
+    SET datetogather = TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL maxDaysToLookBackOnInitialQuery DAY);
   END IF;
 
   INSERT `DatasetID.website_errors` 
@@ -531,9 +529,9 @@ BEGIN
   SELECT 
     CURRENT_TIMESTAMP(),
     user_pseudo_id,
-    TIMESTAMP_MICROS((SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'call_timestamp')) AS call_timestamp,
+    SAFE.TIMESTAMP_MICROS((SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'call_timestamp')) AS call_timestamp,
     (SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'call_sequence') AS call_sequence,
-    TIMESTAMP_MICROS(event_timestamp) AS event_timestamp,
+    SAFE.TIMESTAMP_MICROS(event_timestamp) AS event_timestamp,
     event_date,
     device.web_info.browser AS device_browser,
     device.web_info.browser_version AS device_browser_version,
@@ -592,7 +590,9 @@ BEGIN
   SET datetogather = (SELECT TIMESTAMP_TRUNC(TIMESTAMP_ADD(MAX(PARSE_TIMESTAMP("%Y%m%d",event_date)), INTERVAL -lookbackDays DAY), DAY) FROM `DatasetID.missing_pages`);
 
   IF datetogather IS NOT NULL THEN
-  DELETE FROM `DatasetID.missing_pages` WHERE PARSE_TIMESTAMP("%Y%m%d",event_date) >= datetogather;
+    DELETE FROM `DatasetID.missing_pages` WHERE PARSE_TIMESTAMP("%Y%m%d",event_date) >= datetogather;
+  ELSE
+    SET datetogather = TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL maxDaysToLookBackOnInitialQuery DAY);
   END IF;
 
   INSERT `DatasetID.missing_pages` 
@@ -613,9 +613,9 @@ BEGIN
   SELECT 
     CURRENT_TIMESTAMP(),
     user_pseudo_id,
-    TIMESTAMP_MICROS((SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'call_timestamp')) AS call_timestamp,
+    SAFE.TIMESTAMP_MICROS((SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'call_timestamp')) AS call_timestamp,
     (SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'call_sequence') AS call_sequence,
-    TIMESTAMP_MICROS(event_timestamp) AS event_timestamp,
+    SAFE.TIMESTAMP_MICROS(event_timestamp) AS event_timestamp,
     event_date,
     # traffic_source.medium AS traffic_medium, # user level
     # traffic_source.name AS traffic_name, # user level
