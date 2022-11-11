@@ -18,9 +18,9 @@ BEGIN
 
   DECLARE maxDaysToLookBackOnInitialQuery DEFAULT 32; # two extra days from today to cover the delay in GA4 exporting data 
 
-  DECLARE datetogather DEFAULT CURRENT_TIMESTAMP();
+  DECLARE datetogather DEFAULT CURRENT_TIMESTAMP(); # dummy value. gets updated before every use
   
-  CREATE OR REPLACE TABLE web-site-advantage-ga4.analytics_327863596.tag_rocket 
+  CREATE OR REPLACE TABLE `DatasetID.tag_rocket` 
   AS
   SELECT * FROM (SELECT AS VALUE STRUCT(
     '' AS schedule_frequency, # how frequently the query is scheduled to run. e.g. "monthly", "every Monday", "manually"
