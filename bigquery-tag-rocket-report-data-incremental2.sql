@@ -16,18 +16,45 @@ BEGIN
   # If you have plenty of alowance you could increase it. Probably no need to go beyond lookbackDays being 3 or 4.
   DECLARE lookbackDays DEFAULT 2; 
 
-  DECLARE maxDaysToLookBackOnInitialQuery DEFAULT 32; # two extra days from today to cover the delay in GA4 exporting data 
+  DECLARE partitionExpirationDays DEFAULT 65; # partitions will be deleted when older than the specified days
+  DECLARE maxDaysToLookBackOnInitialQuery DEFAULT 65; # extra days from today to cover the delay in GA4 exporting data 
 
   DECLARE datetogather DEFAULT CURRENT_TIMESTAMP(); # dummy value. gets updated before every use
   
-  CREATE OR REPLACE TABLE `DatasetID.tag_rocket` 
-  AS
+  CREATE OR REPLACE TABLE `DatasetID.tag_rocket` (
+      schedule_frequency STRING,
+      scheduled_by	STRING,
+      store_front_name STRING,
+      store_front_url STRING,
+      notification1_title STRING,
+      notification1_content STRING,
+      notification1_type STRING, 
+      notification2_title STRING,
+      notification2_content STRING,
+      notification2_type STRING,
+      notification3_title STRING,
+      notification3_content STRING,
+      notification3_type STRING,
+      last_exported_date	STRING,			
+      query_version	STRING,			
+      last_run_timestamp	TIMESTAMP
+    )
+  OPTIONS (description = 'Version 4.0')
+  AS  
   SELECT * FROM (SELECT AS VALUE STRUCT(
     '' AS schedule_frequency, # how frequently the query is scheduled to run. e.g. "monthly", "every Monday", "manually"
     '' AS scheduled_by, # e.g. "BigQuery"
     '' AS store_front_name,
     '' AS store_front_url,
-    '' AS notification, # will show as a notification in the report
+    '' AS notification1_title, 
+    '' AS notification1_content, 
+    '' AS notification1_type,  # normal, warning, error
+    '' AS notification2_title, 
+    '' AS notification2_content, 
+    '' AS notification2_type, 
+    '' AS notification3_title, 
+    '' AS notification3_content, 
+    '' AS notification3_type, 
     '' AS last_exported_date, # set when using Tag Rocket to run the query
     version AS query_version,
     CURRENT_TIMESTAMP() AS last_run_timestamp
@@ -104,6 +131,9 @@ BEGIN
     OPTIONS (description = 'Version 4.0'); 
   END IF;
 
+  ALTER TABLE `DatasetID.web_vitals_summary`
+  SET OPTIONS (partition_expiration_days = partitionExpirationDays);
+
   # 10MB min per query makes this look expensive for small tables.
   SET datetogather = (SELECT TIMESTAMP_TRUNC(TIMESTAMP_ADD(MAX(PARSE_TIMESTAMP("%Y%m%d",event_date)), INTERVAL -lookbackDays DAY), DAY) FROM `DatasetID.web_vitals_summary`);
 
@@ -112,8 +142,6 @@ BEGIN
   ELSE
     SET datetogather = TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL maxDaysToLookBackOnInitialQuery DAY);
   END IF;
-
-  
 
   INSERT `DatasetID.web_vitals_summary` 
   (    
@@ -337,6 +365,9 @@ BEGIN
     OPTIONS (description = 'Version 4.0'); 
   END IF;
 
+  ALTER TABLE `DatasetID.purchases`
+  SET OPTIONS (partition_expiration_days = partitionExpirationDays);
+
   # 10MB min per query makes this look expensive for small tables.
   SET datetogather = (SELECT TIMESTAMP_TRUNC(TIMESTAMP_ADD(MAX(PARSE_TIMESTAMP("%Y%m%d",event_date)), INTERVAL -lookbackDays DAY), DAY) FROM `DatasetID.purchases`);
 
@@ -491,6 +522,8 @@ BEGIN
     OPTIONS (description = 'Version 4.0'); 
   END IF;
 
+  ALTER TABLE `DatasetID.website_errors`
+  SET OPTIONS (partition_expiration_days = partitionExpirationDays);
 
   # 10MB min per query makes this look expensive for small tables.
   SET datetogather = (SELECT TIMESTAMP_TRUNC(TIMESTAMP_ADD(MAX(PARSE_TIMESTAMP("%Y%m%d",event_date)), INTERVAL -lookbackDays DAY), DAY) FROM `DatasetID.website_errors`);
@@ -586,6 +619,9 @@ BEGIN
     PARTITION BY TIMESTAMP_TRUNC(event_timestamp, DAY)
     OPTIONS (description = 'Version 4.0');
   END IF;
+
+  ALTER TABLE `DatasetID.missing_pages`
+  SET OPTIONS (partition_expiration_days = partitionExpirationDays);
 
   SET datetogather = (SELECT TIMESTAMP_TRUNC(TIMESTAMP_ADD(MAX(PARSE_TIMESTAMP("%Y%m%d",event_date)), INTERVAL -lookbackDays DAY), DAY) FROM `DatasetID.missing_pages`);
 
