@@ -37,11 +37,12 @@ BEGIN
       notification3_content STRING,
       notification3_type STRING,
       last_exported_date	STRING,			
-      query_version	STRING,		
+     
       partition_expiration STRING,	
       bigquery_project_id STRING,	
       ga4_account_id STRING,	
       ga4_property_id STRING,		
+      query_version	STRING,		
       last_run_timestamp	TIMESTAMP
     )
   OPTIONS (description = 'Version 4.1') # queryVersion
@@ -60,11 +61,11 @@ BEGIN
     '', # notification3_title
     '', # notification3_content
     '', # notification3_type 
+    '', # last_exported_date: set when using Tag Rocket to run the query
     '', # partition_expiration
     '', # bigquery_project_id
     '', # ga4_account_id
     '', # ga4_property_id
-    '', # last_exported_date: set when using Tag Rocket to run the query
     '4.1', # query_version queryVersion
     CURRENT_TIMESTAMP() # last_run_timestamp
   ));
