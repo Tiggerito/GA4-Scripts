@@ -16,7 +16,8 @@ BEGIN
   # If you have plenty of alowance you could increase it. Probably no need to go beyond lookbackDays being 3 or 4.
   DECLARE lookbackDays DEFAULT 2; 
 
-  DECLARE partitionExpirationDays DEFAULT 65; # partitions will be deleted when older than the specified days
+  # partitions will be deleted when older than 65 days, you can update this by searching for partitionExpirationDays and updating the number of days
+
   DECLARE maxDaysToLookBackOnInitialQuery DEFAULT 65; # extra days from today to cover the delay in GA4 exporting data 
 
   DECLARE datetogather DEFAULT CURRENT_TIMESTAMP(); # dummy value. gets updated before every use
@@ -36,7 +37,8 @@ BEGIN
       notification3_content STRING,
       notification3_type STRING,
       last_exported_date	STRING,			
-      query_version	STRING,			
+      query_version	STRING,		
+      partition_expiration STRING,		
       last_run_timestamp	TIMESTAMP
     )
   OPTIONS (description = 'Version 4.0')
@@ -55,6 +57,7 @@ BEGIN
     '' AS notification3_title, 
     '' AS notification3_content, 
     '' AS notification3_type, 
+    '' AS partition_expiration,
     '' AS last_exported_date, # set when using Tag Rocket to run the query
     version AS query_version,
     CURRENT_TIMESTAMP() AS last_run_timestamp
@@ -132,7 +135,7 @@ BEGIN
   END IF;
 
   ALTER TABLE `DatasetID.web_vitals_summary`
-  SET OPTIONS (partition_expiration_days = partitionExpirationDays);
+  SET OPTIONS (partition_expiration_days = 65); # partitionExpirationDays
 
   # 10MB min per query makes this look expensive for small tables.
   SET datetogather = (SELECT TIMESTAMP_TRUNC(TIMESTAMP_ADD(MAX(PARSE_TIMESTAMP("%Y%m%d",event_date)), INTERVAL -lookbackDays DAY), DAY) FROM `DatasetID.web_vitals_summary`);
@@ -140,7 +143,9 @@ BEGIN
   IF datetogather IS NOT NULL THEN
     DELETE FROM `DatasetID.web_vitals_summary` WHERE PARSE_TIMESTAMP("%Y%m%d",event_date) >= datetogather;
   ELSE
-    SET datetogather = TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL maxDaysToLookBackOnInitialQuery DAY);
+    IF maxDaysToLookBackOnInitialQuery IS NOT NULL THEN
+      SET datetogather = TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL maxDaysToLookBackOnInitialQuery DAY);
+    END IF;
   END IF;
 
   INSERT `DatasetID.web_vitals_summary` 
@@ -366,7 +371,7 @@ BEGIN
   END IF;
 
   ALTER TABLE `DatasetID.purchases`
-  SET OPTIONS (partition_expiration_days = partitionExpirationDays);
+  SET OPTIONS (partition_expiration_days = 65); # partitionExpirationDays
 
   # 10MB min per query makes this look expensive for small tables.
   SET datetogather = (SELECT TIMESTAMP_TRUNC(TIMESTAMP_ADD(MAX(PARSE_TIMESTAMP("%Y%m%d",event_date)), INTERVAL -lookbackDays DAY), DAY) FROM `DatasetID.purchases`);
@@ -374,7 +379,9 @@ BEGIN
   IF datetogather IS NOT NULL THEN
     DELETE FROM `DatasetID.purchases` WHERE PARSE_TIMESTAMP("%Y%m%d",event_date) >= datetogather;
   ELSE
-    SET datetogather = TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL maxDaysToLookBackOnInitialQuery DAY);
+    IF maxDaysToLookBackOnInitialQuery IS NOT NULL THEN
+      SET datetogather = TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL maxDaysToLookBackOnInitialQuery DAY);
+    END IF;
   END IF;
 
  INSERT `DatasetID.purchases`  
@@ -523,7 +530,7 @@ BEGIN
   END IF;
 
   ALTER TABLE `DatasetID.website_errors`
-  SET OPTIONS (partition_expiration_days = partitionExpirationDays);
+  SET OPTIONS (partition_expiration_days = 65); # partitionExpirationDays
 
   # 10MB min per query makes this look expensive for small tables.
   SET datetogather = (SELECT TIMESTAMP_TRUNC(TIMESTAMP_ADD(MAX(PARSE_TIMESTAMP("%Y%m%d",event_date)), INTERVAL -lookbackDays DAY), DAY) FROM `DatasetID.website_errors`);
@@ -531,7 +538,9 @@ BEGIN
   IF datetogather IS NOT NULL THEN
     DELETE FROM `DatasetID.website_errors` WHERE PARSE_TIMESTAMP("%Y%m%d",event_date) >= datetogather;
   ELSE
-    SET datetogather = TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL maxDaysToLookBackOnInitialQuery DAY);
+    IF maxDaysToLookBackOnInitialQuery IS NOT NULL THEN
+      SET datetogather = TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL maxDaysToLookBackOnInitialQuery DAY);
+    END IF;
   END IF;
 
   INSERT `DatasetID.website_errors` 
@@ -621,14 +630,16 @@ BEGIN
   END IF;
 
   ALTER TABLE `DatasetID.missing_pages`
-  SET OPTIONS (partition_expiration_days = partitionExpirationDays);
+  SET OPTIONS (partition_expiration_days = 65); # partitionExpirationDays
 
   SET datetogather = (SELECT TIMESTAMP_TRUNC(TIMESTAMP_ADD(MAX(PARSE_TIMESTAMP("%Y%m%d",event_date)), INTERVAL -lookbackDays DAY), DAY) FROM `DatasetID.missing_pages`);
 
   IF datetogather IS NOT NULL THEN
     DELETE FROM `DatasetID.missing_pages` WHERE PARSE_TIMESTAMP("%Y%m%d",event_date) >= datetogather;
   ELSE
-    SET datetogather = TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL maxDaysToLookBackOnInitialQuery DAY);
+    IF maxDaysToLookBackOnInitialQuery IS NOT NULL THEN
+      SET datetogather = TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL maxDaysToLookBackOnInitialQuery DAY);
+    END IF;
   END IF;
 
   INSERT `DatasetID.missing_pages` 
