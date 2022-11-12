@@ -47,26 +47,26 @@ BEGIN
   OPTIONS (description = 'Version 4.1')
   AS  
   SELECT * FROM (SELECT AS VALUE STRUCT(
-    '' AS schedule_frequency, # how frequently the query is scheduled to run. e.g. "monthly", "every Monday", "manually"
-    '' AS scheduled_by, # e.g. "BigQuery"
-    '' AS store_front_name,
-    '' AS store_front_url,
-    '' AS notification1_title, 
-    '' AS notification1_content, 
-    '' AS notification1_type,  # normal, warning, error
-    '' AS notification2_title, 
-    '' AS notification2_content, 
-    '' AS notification2_type, 
-    '' AS notification3_title, 
-    '' AS notification3_content, 
-    '' AS notification3_type, 
-    '' AS partition_expiration,
-    '' AS bigquery_project_id,
-    '' AS ga4_account_id,
-    '' AS ga4_property_id,
-    '' AS last_exported_date, # set when using Tag Rocket to run the query
-    version AS query_version,
-    CURRENT_TIMESTAMP() AS last_run_timestamp
+    '', # schedule_frequency: how frequently the query is scheduled to run. e.g. "monthly", "every Monday", "manually"
+    '', # scheduled_by:  e.g. "BigQuery"
+    '', # store_front_name
+    '', # store_front_url
+    '', # notification1_title 
+    '', # notification1_content 
+    '', # notification1_type: normal, warning, error
+    '', # notification2_title 
+    '', # notification2_content
+    '', # notification2_type 
+    '', # notification3_title
+    '', # notification3_content
+    '', # notification3_type 
+    '', # partition_expiration
+    '', # bigquery_project_id
+    '', # ga4_account_id
+    '', # ga4_property_id
+    '', # last_exported_date: set when using Tag Rocket to run the query
+    version, # query_version
+    CURRENT_TIMESTAMP(), # last_run_timestamp
   ));
 
   # 60 days
