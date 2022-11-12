@@ -6,19 +6,19 @@
 BEGIN
   # The first run with gather all data. After that it will gather new data and merge the last 3 days of data
 
-  DECLARE version DEFAULT "4.1";
+  # To update the version search for queryVersion and replace the version number near it. And the one at the top.
 
+  DECLARE lookbackDays DEFAULT 2; 
   # this means lookbackDays+1 days of GA4 export data are processed each time. 
   # GA4 states they add events that happen 72 hours after the fact, and then re-export the relevant days table 
   # 2+1=3 days should capture most late processed events.
   # The queries look back based on the last day that had been processed, so there should be no issues if the GA4 export gets delayed.
   # If you are reaching your monthly free limit you could reduce the lookback at the risk of losing a bit of data
   # If you have plenty of alowance you could increase it. Probably no need to go beyond lookbackDays being 3 or 4.
-  DECLARE lookbackDays DEFAULT 2; 
 
-  # partitions will be deleted when older than 65 days, you can update this by searching for partitionExpirationDays and updating the number of days
+  # partitions will be deleted when older than 65 days, you can update this by searching for partitionExpirationDays and updating the number of days. NULL for never
 
-  DECLARE maxDaysToLookBackOnInitialQuery DEFAULT 65; # extra days from today to cover the delay in GA4 exporting data 
+  DECLARE maxDaysToLookBackOnInitialQuery DEFAULT 65; # extra days from today to cover the delay in GA4 exporting data. No use in having it larger than partitionExpirationDays
 
   DECLARE datetogather DEFAULT CURRENT_TIMESTAMP(); # dummy value. gets updated before every use
   
@@ -44,7 +44,7 @@ BEGIN
       ga4_property_id STRING,		
       last_run_timestamp	TIMESTAMP
     )
-  OPTIONS (description = 'Version 4.1')
+  OPTIONS (description = 'Version 4.1') # queryVersion
   AS  
   SELECT * FROM (SELECT AS VALUE STRUCT(
     '', # schedule_frequency: how frequently the query is scheduled to run. e.g. "monthly", "every Monday", "manually"
@@ -65,7 +65,7 @@ BEGIN
     '', # ga4_account_id
     '', # ga4_property_id
     '', # last_exported_date: set when using Tag Rocket to run the query
-    version, # query_version
+    '4.1', # query_version queryVersion
     CURRENT_TIMESTAMP(), # last_run_timestamp
   ));
 
@@ -97,7 +97,7 @@ BEGIN
     WHERE
       table_name = 'web_vitals_summary'
       AND option_name = 'description'
-      AND option_value LIKE "%Version 4.1%"
+      AND option_value LIKE "%Version 4.1%" # queryVersion
   ) 
   THEN
     CREATE OR REPLACE TABLE `DatasetID.web_vitals_summary` (
@@ -137,7 +137,7 @@ BEGIN
     )
     PARTITION BY DATE(event_timestamp)
     CLUSTER BY metric_name
-    OPTIONS (description = 'Version 4.1'); 
+    OPTIONS (description = 'Version 4.1');  # queryVersion
   END IF;
 
   ALTER TABLE `DatasetID.web_vitals_summary`
@@ -339,7 +339,7 @@ BEGIN
     WHERE
       table_name = 'purchases'
       AND option_name = 'description'
-      AND option_value LIKE "%Version 4.1%"
+      AND option_value LIKE "%Version 4.1%" # queryVersion
   ) 
   THEN
     CREATE OR REPLACE TABLE `DatasetID.purchases` (
@@ -373,7 +373,7 @@ BEGIN
     )
     # or maybe month? each partition should be 1GB https://medium.com/dataseries/costs-and-performance-lessons-after-using-bigquery-with-terabytes-of-data-54a5809ac912
     PARTITION BY TIMESTAMP_TRUNC(event_timestamp, DAY)
-    OPTIONS (description = 'Version 4.1'); 
+    OPTIONS (description = 'Version 4.1');  # queryVersion
   END IF;
 
   ALTER TABLE `DatasetID.purchases`
@@ -503,7 +503,7 @@ BEGIN
     WHERE
       table_name = 'website_errors'
       AND option_name = 'description'
-      AND option_value LIKE "%Version 4.1%"
+      AND option_value LIKE "%Version 4.1%" # queryVersion
   ) 
   THEN
     CREATE OR REPLACE TABLE `DatasetID.website_errors` (
@@ -532,7 +532,7 @@ BEGIN
     )
     # or maybe month? each partition should be 1GB https://medium.com/dataseries/costs-and-performance-lessons-after-using-bigquery-with-terabytes-of-data-54a5809ac912
     PARTITION BY TIMESTAMP_TRUNC(event_timestamp, DAY)
-    OPTIONS (description = 'Version 4.1'); 
+    OPTIONS (description = 'Version 4.1');  # queryVersion
   END IF;
 
   ALTER TABLE `DatasetID.website_errors`
@@ -613,7 +613,7 @@ BEGIN
     WHERE
       table_name = 'missing_pages'
       AND option_name = 'description'
-      AND option_value LIKE "%Version 4.1%"
+      AND option_value LIKE "%Version 4.1%" # queryVersion
   ) 
   THEN
     CREATE OR REPLACE TABLE `DatasetID.missing_pages` (
@@ -632,7 +632,7 @@ BEGIN
     )
     # or maybe month? each partition should be 1GB https://medium.com/dataseries/costs-and-performance-lessons-after-using-bigquery-with-terabytes-of-data-54a5809ac912
     PARTITION BY TIMESTAMP_TRUNC(event_timestamp, DAY)
-    OPTIONS (description = 'Version 4.1');
+    OPTIONS (description = 'Version 4.1'); # queryVersion
   END IF;
 
   ALTER TABLE `DatasetID.missing_pages`
