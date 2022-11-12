@@ -66,7 +66,7 @@ BEGIN
     '', # ga4_property_id
     '', # last_exported_date: set when using Tag Rocket to run the query
     '4.1', # query_version queryVersion
-    CURRENT_TIMESTAMP(), # last_run_timestamp
+    CURRENT_TIMESTAMP() # last_run_timestamp
   ));
 
   # 60 days
