@@ -1,4 +1,4 @@
-# Tag Rocket Report Data Incremental 2 v4.0
+# Tag Rocket Report Data Incremental 2 v4.1
 # https://github.com/Tiggerito/GA4-Scripts/blob/main/bigquery-tag-rocket-report-data-incremental2.sql
 
 # Replace all occurances of DatasetID with your Dataset ID
@@ -6,7 +6,7 @@
 BEGIN
   # The first run with gather all data. After that it will gather new data and merge the last 3 days of data
 
-  DECLARE version DEFAULT "4.0";
+  DECLARE version DEFAULT "4.1";
 
   # this means lookbackDays+1 days of GA4 export data are processed each time. 
   # GA4 states they add events that happen 72 hours after the fact, and then re-export the relevant days table 
@@ -38,10 +38,13 @@ BEGIN
       notification3_type STRING,
       last_exported_date	STRING,			
       query_version	STRING,		
-      partition_expiration STRING,		
+      partition_expiration STRING,	
+      bigquery_project_id STRING,	
+      ga4_account_id STRING,	
+      ga4_property_id STRING,		
       last_run_timestamp	TIMESTAMP
     )
-  OPTIONS (description = 'Version 4.0')
+  OPTIONS (description = 'Version 4.1')
   AS  
   SELECT * FROM (SELECT AS VALUE STRUCT(
     '' AS schedule_frequency, # how frequently the query is scheduled to run. e.g. "monthly", "every Monday", "manually"
@@ -58,6 +61,9 @@ BEGIN
     '' AS notification3_content, 
     '' AS notification3_type, 
     '' AS partition_expiration,
+    '' AS bigquery_project_id,
+    '' AS ga4_account_id,
+    '' AS ga4_property_id,
     '' AS last_exported_date, # set when using Tag Rocket to run the query
     version AS query_version,
     CURRENT_TIMESTAMP() AS last_run_timestamp
@@ -91,7 +97,7 @@ BEGIN
     WHERE
       table_name = 'web_vitals_summary'
       AND option_name = 'description'
-      AND option_value LIKE "%Version 4.0%"
+      AND option_value LIKE "%Version 4.1%"
   ) 
   THEN
     CREATE OR REPLACE TABLE `DatasetID.web_vitals_summary` (
@@ -131,7 +137,7 @@ BEGIN
     )
     PARTITION BY DATE(event_timestamp)
     CLUSTER BY metric_name
-    OPTIONS (description = 'Version 4.0'); 
+    OPTIONS (description = 'Version 4.1'); 
   END IF;
 
   ALTER TABLE `DatasetID.web_vitals_summary`
@@ -333,7 +339,7 @@ BEGIN
     WHERE
       table_name = 'purchases'
       AND option_name = 'description'
-      AND option_value LIKE "%Version 4.0%"
+      AND option_value LIKE "%Version 4.1%"
   ) 
   THEN
     CREATE OR REPLACE TABLE `DatasetID.purchases` (
@@ -367,7 +373,7 @@ BEGIN
     )
     # or maybe month? each partition should be 1GB https://medium.com/dataseries/costs-and-performance-lessons-after-using-bigquery-with-terabytes-of-data-54a5809ac912
     PARTITION BY TIMESTAMP_TRUNC(event_timestamp, DAY)
-    OPTIONS (description = 'Version 4.0'); 
+    OPTIONS (description = 'Version 4.1'); 
   END IF;
 
   ALTER TABLE `DatasetID.purchases`
@@ -497,7 +503,7 @@ BEGIN
     WHERE
       table_name = 'website_errors'
       AND option_name = 'description'
-      AND option_value LIKE "%Version 4.0%"
+      AND option_value LIKE "%Version 4.1%"
   ) 
   THEN
     CREATE OR REPLACE TABLE `DatasetID.website_errors` (
@@ -526,7 +532,7 @@ BEGIN
     )
     # or maybe month? each partition should be 1GB https://medium.com/dataseries/costs-and-performance-lessons-after-using-bigquery-with-terabytes-of-data-54a5809ac912
     PARTITION BY TIMESTAMP_TRUNC(event_timestamp, DAY)
-    OPTIONS (description = 'Version 4.0'); 
+    OPTIONS (description = 'Version 4.1'); 
   END IF;
 
   ALTER TABLE `DatasetID.website_errors`
@@ -607,7 +613,7 @@ BEGIN
     WHERE
       table_name = 'missing_pages'
       AND option_name = 'description'
-      AND option_value LIKE "%Version 4.0%"
+      AND option_value LIKE "%Version 4.1%"
   ) 
   THEN
     CREATE OR REPLACE TABLE `DatasetID.missing_pages` (
@@ -626,7 +632,7 @@ BEGIN
     )
     # or maybe month? each partition should be 1GB https://medium.com/dataseries/costs-and-performance-lessons-after-using-bigquery-with-terabytes-of-data-54a5809ac912
     PARTITION BY TIMESTAMP_TRUNC(event_timestamp, DAY)
-    OPTIONS (description = 'Version 4.0');
+    OPTIONS (description = 'Version 4.1');
   END IF;
 
   ALTER TABLE `DatasetID.missing_pages`
