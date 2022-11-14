@@ -1,7 +1,11 @@
-# Tag Rocket Report Data Incremental 2 v4.1
+# Tag Rocket Report Data Incremental 2 v4.2
 # https://github.com/Tiggerito/GA4-Scripts/blob/main/bigquery-tag-rocket-report-data-incremental2.sql
 
-# Replace all occurances of DatasetID with your Dataset ID
+# Replace all occurances of DatasetID with your Dataset ID for the GA4 export. Something like analytics_1234567890
+
+# before running
+# create a dataset called 'tag_rocket'. This is for all the tables this query creates for reporting
+# create a dataset called 'bq_logs' with a table expiration of 65 days. This is to track billable query usage
 
 BEGIN
   # The first run with gather all data. After that it will gather new data and merge the last 3 days of data
@@ -21,8 +25,10 @@ BEGIN
   DECLARE maxDaysToLookBackOnInitialQuery DEFAULT 65; # extra days from today to cover the delay in GA4 exporting data. No use in having it larger than partitionExpirationDays
 
   DECLARE datetogather DEFAULT CURRENT_TIMESTAMP(); # dummy value. gets updated before every use
+
+  # meta data
   
-  CREATE OR REPLACE TABLE `DatasetID.tag_rocket` (
+  CREATE OR REPLACE TABLE `tag_rocket.meta_data` (
       schedule_frequency STRING,
       scheduled_by	STRING,
       store_front_name STRING,
@@ -36,8 +42,7 @@ BEGIN
       notification3_title STRING,
       notification3_content STRING,
       notification3_type STRING,
-      last_exported_date	STRING,			
-     
+      last_exported_date	STRING,			     
       partition_expiration STRING,	
       bigquery_project_id STRING,	
       ga4_account_id STRING,	
@@ -45,7 +50,7 @@ BEGIN
       query_version	STRING,		
       last_run_timestamp	TIMESTAMP
     )
-  OPTIONS (description = 'Version 4.1') # queryVersion
+  OPTIONS (description = 'Version 4.2') # queryVersion
   AS  
   SELECT * FROM (SELECT AS VALUE STRUCT(
     '', # schedule_frequency: how frequently the query is scheduled to run. e.g. "monthly", "every Monday", "manually"
@@ -66,7 +71,7 @@ BEGIN
     '', # bigquery_project_id
     '', # ga4_account_id
     '', # ga4_property_id
-    '4.1', # query_version queryVersion
+    '4.2', # query_version queryVersion
     CURRENT_TIMESTAMP() # last_run_timestamp
   ));
 
@@ -94,14 +99,14 @@ BEGIN
     SELECT
       1
     FROM
-      `DatasetID.INFORMATION_SCHEMA.TABLE_OPTIONS`
+      `tag_rocket.INFORMATION_SCHEMA.TABLE_OPTIONS`
     WHERE
-      table_name = 'web_vitals_summary'
+      table_name = 'web_vitals'
       AND option_name = 'description'
-      AND option_value LIKE "%Version 4.1%" # queryVersion
+      AND option_value LIKE "%Version 4.2%" # queryVersion
   ) 
   THEN
-    CREATE OR REPLACE TABLE `DatasetID.web_vitals_summary` (
+    CREATE OR REPLACE TABLE `tag_rocket.web_vitals` (
       last_updated TIMESTAMP,
       user_pseudo_id	STRING,
       call_timestamp TIMESTAMP,
@@ -138,24 +143,24 @@ BEGIN
     )
     PARTITION BY DATE(event_timestamp)
     CLUSTER BY metric_name
-    OPTIONS (description = 'Version 4.1');  # queryVersion
+    OPTIONS (description = 'Version 4.2');  # queryVersion
   END IF;
 
-  ALTER TABLE `DatasetID.web_vitals_summary`
+  ALTER TABLE `tag_rocket.web_vitals`
   SET OPTIONS (partition_expiration_days = 65); # partitionExpirationDays
 
   # 10MB min per query makes this look expensive for small tables.
-  SET datetogather = (SELECT TIMESTAMP_TRUNC(TIMESTAMP_ADD(MAX(PARSE_TIMESTAMP("%Y%m%d",event_date)), INTERVAL -lookbackDays DAY), DAY) FROM `DatasetID.web_vitals_summary`);
+  SET datetogather = (SELECT TIMESTAMP_TRUNC(TIMESTAMP_ADD(MAX(PARSE_TIMESTAMP("%Y%m%d",event_date)), INTERVAL -lookbackDays DAY), DAY) FROM `tag_rocket.web_vitals`);
 
   IF datetogather IS NOT NULL THEN
-    DELETE FROM `DatasetID.web_vitals_summary` WHERE PARSE_TIMESTAMP("%Y%m%d",event_date) >= datetogather;
+    DELETE FROM `tag_rocket.web_vitals` WHERE PARSE_TIMESTAMP("%Y%m%d",event_date) >= datetogather;
   ELSE
     IF maxDaysToLookBackOnInitialQuery IS NOT NULL THEN
       SET datetogather = TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL maxDaysToLookBackOnInitialQuery DAY);
     END IF;
   END IF;
 
-  INSERT `DatasetID.web_vitals_summary` 
+  INSERT `tag_rocket.web_vitals` 
   (    
     last_updated,
     ga_session_id,
@@ -336,14 +341,14 @@ BEGIN
     SELECT
       1
     FROM
-      `DatasetID.INFORMATION_SCHEMA.TABLE_OPTIONS`
+      `tag_rocket.INFORMATION_SCHEMA.TABLE_OPTIONS`
     WHERE
       table_name = 'purchases'
       AND option_name = 'description'
-      AND option_value LIKE "%Version 4.1%" # queryVersion
+      AND option_value LIKE "%Version 4.2%" # queryVersion
   ) 
   THEN
-    CREATE OR REPLACE TABLE `DatasetID.purchases` (
+    CREATE OR REPLACE TABLE `tag_rocket.purchases` (
       last_updated TIMESTAMP,
       user_pseudo_id	STRING,
       call_timestamp TIMESTAMP,
@@ -374,24 +379,24 @@ BEGIN
     )
     # or maybe month? each partition should be 1GB https://medium.com/dataseries/costs-and-performance-lessons-after-using-bigquery-with-terabytes-of-data-54a5809ac912
     PARTITION BY TIMESTAMP_TRUNC(event_timestamp, DAY)
-    OPTIONS (description = 'Version 4.1');  # queryVersion
+    OPTIONS (description = 'Version 4.2');  # queryVersion
   END IF;
 
-  ALTER TABLE `DatasetID.purchases`
+  ALTER TABLE `tag_rocket.purchases`
   SET OPTIONS (partition_expiration_days = 65); # partitionExpirationDays
 
   # 10MB min per query makes this look expensive for small tables.
-  SET datetogather = (SELECT TIMESTAMP_TRUNC(TIMESTAMP_ADD(MAX(PARSE_TIMESTAMP("%Y%m%d",event_date)), INTERVAL -lookbackDays DAY), DAY) FROM `DatasetID.purchases`);
+  SET datetogather = (SELECT TIMESTAMP_TRUNC(TIMESTAMP_ADD(MAX(PARSE_TIMESTAMP("%Y%m%d",event_date)), INTERVAL -lookbackDays DAY), DAY) FROM `tag_rocket.purchases`);
 
   IF datetogather IS NOT NULL THEN
-    DELETE FROM `DatasetID.purchases` WHERE PARSE_TIMESTAMP("%Y%m%d",event_date) >= datetogather;
+    DELETE FROM `tag_rocket.purchases` WHERE PARSE_TIMESTAMP("%Y%m%d",event_date) >= datetogather;
   ELSE
     IF maxDaysToLookBackOnInitialQuery IS NOT NULL THEN
       SET datetogather = TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL maxDaysToLookBackOnInitialQuery DAY);
     END IF;
   END IF;
 
- INSERT `DatasetID.purchases`  
+ INSERT `tag_rocket.purchases`  
   (
       last_updated,
       user_pseudo_id,
@@ -500,14 +505,14 @@ BEGIN
     SELECT
       1
     FROM
-      `DatasetID.INFORMATION_SCHEMA.TABLE_OPTIONS`
+      `tag_rocket.INFORMATION_SCHEMA.TABLE_OPTIONS`
     WHERE
       table_name = 'website_errors'
       AND option_name = 'description'
-      AND option_value LIKE "%Version 4.1%" # queryVersion
+      AND option_value LIKE "%Version 4.2%" # queryVersion
   ) 
   THEN
-    CREATE OR REPLACE TABLE `DatasetID.website_errors` (
+    CREATE OR REPLACE TABLE `tag_rocket.website_errors` (
       last_updated TIMESTAMP,
       user_pseudo_id	STRING,
       call_timestamp TIMESTAMP,
@@ -533,24 +538,24 @@ BEGIN
     )
     # or maybe month? each partition should be 1GB https://medium.com/dataseries/costs-and-performance-lessons-after-using-bigquery-with-terabytes-of-data-54a5809ac912
     PARTITION BY TIMESTAMP_TRUNC(event_timestamp, DAY)
-    OPTIONS (description = 'Version 4.1');  # queryVersion
+    OPTIONS (description = 'Version 4.2');  # queryVersion
   END IF;
 
-  ALTER TABLE `DatasetID.website_errors`
+  ALTER TABLE `tag_rocket.website_errors`
   SET OPTIONS (partition_expiration_days = 65); # partitionExpirationDays
 
   # 10MB min per query makes this look expensive for small tables.
-  SET datetogather = (SELECT TIMESTAMP_TRUNC(TIMESTAMP_ADD(MAX(PARSE_TIMESTAMP("%Y%m%d",event_date)), INTERVAL -lookbackDays DAY), DAY) FROM `DatasetID.website_errors`);
+  SET datetogather = (SELECT TIMESTAMP_TRUNC(TIMESTAMP_ADD(MAX(PARSE_TIMESTAMP("%Y%m%d",event_date)), INTERVAL -lookbackDays DAY), DAY) FROM `tag_rocket.website_errors`);
 
   IF datetogather IS NOT NULL THEN
-    DELETE FROM `DatasetID.website_errors` WHERE PARSE_TIMESTAMP("%Y%m%d",event_date) >= datetogather;
+    DELETE FROM `tag_rocket.website_errors` WHERE PARSE_TIMESTAMP("%Y%m%d",event_date) >= datetogather;
   ELSE
     IF maxDaysToLookBackOnInitialQuery IS NOT NULL THEN
       SET datetogather = TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL maxDaysToLookBackOnInitialQuery DAY);
     END IF;
   END IF;
 
-  INSERT `DatasetID.website_errors` 
+  INSERT `tag_rocket.website_errors` 
   (
     last_updated,
     user_pseudo_id,
@@ -610,14 +615,14 @@ BEGIN
     SELECT
       1
     FROM
-      `DatasetID.INFORMATION_SCHEMA.TABLE_OPTIONS`
+      `tag_rocket.INFORMATION_SCHEMA.TABLE_OPTIONS`
     WHERE
       table_name = 'missing_pages'
       AND option_name = 'description'
-      AND option_value LIKE "%Version 4.1%" # queryVersion
+      AND option_value LIKE "%Version 4.2%" # queryVersion
   ) 
   THEN
-    CREATE OR REPLACE TABLE `DatasetID.missing_pages` (
+    CREATE OR REPLACE TABLE `tag_rocket.missing_pages` (
       last_updated TIMESTAMP,
       user_pseudo_id	STRING,
       call_timestamp TIMESTAMP,
@@ -633,23 +638,23 @@ BEGIN
     )
     # or maybe month? each partition should be 1GB https://medium.com/dataseries/costs-and-performance-lessons-after-using-bigquery-with-terabytes-of-data-54a5809ac912
     PARTITION BY TIMESTAMP_TRUNC(event_timestamp, DAY)
-    OPTIONS (description = 'Version 4.1'); # queryVersion
+    OPTIONS (description = 'Version 4.2'); # queryVersion
   END IF;
 
-  ALTER TABLE `DatasetID.missing_pages`
+  ALTER TABLE `tag_rocket.missing_pages`
   SET OPTIONS (partition_expiration_days = 65); # partitionExpirationDays
 
-  SET datetogather = (SELECT TIMESTAMP_TRUNC(TIMESTAMP_ADD(MAX(PARSE_TIMESTAMP("%Y%m%d",event_date)), INTERVAL -lookbackDays DAY), DAY) FROM `DatasetID.missing_pages`);
+  SET datetogather = (SELECT TIMESTAMP_TRUNC(TIMESTAMP_ADD(MAX(PARSE_TIMESTAMP("%Y%m%d",event_date)), INTERVAL -lookbackDays DAY), DAY) FROM `tag_rocket.missing_pages`);
 
   IF datetogather IS NOT NULL THEN
-    DELETE FROM `DatasetID.missing_pages` WHERE PARSE_TIMESTAMP("%Y%m%d",event_date) >= datetogather;
+    DELETE FROM `tag_rocket.missing_pages` WHERE PARSE_TIMESTAMP("%Y%m%d",event_date) >= datetogather;
   ELSE
     IF maxDaysToLookBackOnInitialQuery IS NOT NULL THEN
       SET datetogather = TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL maxDaysToLookBackOnInitialQuery DAY);
     END IF;
   END IF;
 
-  INSERT `DatasetID.missing_pages` 
+  INSERT `tag_rocket.missing_pages` 
   (
     last_updated,
     user_pseudo_id,
@@ -684,4 +689,71 @@ BEGIN
   WHERE event_name = 'page_view'
   AND (datetogather IS NULL OR _table_suffix BETWEEN FORMAT_DATE('%Y%m%d',datetogather) AND FORMAT_DATE('%Y%m%d',CURRENT_DATE()));
  
+  # Billed Queries Log
+
+  IF NOT EXISTS(
+    SELECT
+      1
+    FROM
+      `tag_rocket.INFORMATION_SCHEMA.TABLE_OPTIONS`
+    WHERE
+      table_name = 'query_logs'
+      AND option_name = 'description'
+      AND option_value LIKE "%Version 4.2%" # queryVersion
+  ) 
+  THEN
+    CREATE OR REPLACE TABLE `tag_rocket.query_logs` (
+      day_timestamp TIMESTAMP,
+      principal_email	STRING,
+      gb_billed INT64,
+    #  gb_processed INT64,
+    #  query_count INT64,
+      billed_query_count	INT64,
+    error_count	INT64
+    )
+    PARTITION BY DATE(day_timestamp)
+    OPTIONS (description = 'Version 4.2'); # queryVersion
+  END IF;
+
+  SET datetogather = (SELECT TIMESTAMP_TRUNC(TIMESTAMP_ADD(MAX(day_timestamp), INTERVAL -1 DAY), DAY) FROM `tag_rocket.query_logs`);
+
+  IF datetogather IS NOT NULL THEN
+    DELETE FROM `tag_rocket.query_logs` WHERE day_timestamp >= datetogather;
+  ELSE
+    IF maxDaysToLookBackOnInitialQuery IS NOT NULL THEN
+      SET datetogather = TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL maxDaysToLookBackOnInitialQuery DAY);
+    END IF;
+  END IF;
+
+  IF EXISTS(
+    SELECT
+      1
+    FROM
+      `bq_logs.INFORMATION_SCHEMA.TABLE_OPTIONS`
+    WHERE
+      table_name LIKE "cloudaudit_googleapis_com_data_access_%"
+  ) 
+  THEN
+    INSERT `tag_rocket.query_logs` 
+    (
+      day_timestamp,
+      principal_email,
+      gb_billed,
+      billed_query_count
+    )
+    SELECT
+      TIMESTAMP_TRUNC(timestamp, DAY) AS day_timestamp,
+      protopayload_auditlog.authenticationInfo.principalEmail AS principal_email,
+      SUM(protopayload_auditlog.servicedata_v1_bigquery.jobCompletedEvent.job.jobStatistics.totalBilledBytes/(1024*1024*1024)) AS gb_billed, 
+    #  SUM(protopayload_auditlog.servicedata_v1_bigquery.jobCompletedEvent.job.jobStatistics.totalProcessedBytes/(1024*1024*1024)) AS gb_processed,
+      COUNT(1) AS billed_query_count,
+    #  COUNTIF(protopayload_auditlog.servicedata_v1_bigquery.jobCompletedEvent.job.jobStatistics.totalBilledBytes > 0) AS billed_query_count,
+    COUNTIF(protopayload_auditlog.servicedata_v1_bigquery.jobCompletedEvent.job.jobStatus.error.message IS NOT NULL) AS error_count
+    FROM
+      `bq_logs.cloudaudit_googleapis_com_data_access_*`
+    WHERE datetogather IS NULL OR TIMESTAMP_TRUNC(timestamp, DAY) >= datetogather
+    GROUP BY 1, 2
+    ORDER BY day_timestamp DESC, principal_email;
+  END IF;
+
 END;
