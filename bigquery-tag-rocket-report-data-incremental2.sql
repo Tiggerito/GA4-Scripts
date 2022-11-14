@@ -3,9 +3,7 @@
 
 # Replace all occurances of DatasetID with your Dataset ID for the GA4 export. Something like analytics_1234567890
 
-# before running
-# create a dataset called 'tag_rocket'. This is for all the tables this query creates for reporting
-# create a dataset called 'bq_logs' with a table expiration of 65 days. This is to track billable query usage
+# make sure you run this using the same location as your analytics dataset
 
 BEGIN
   # The first run with gather all data. After that it will gather new data and merge the last 3 days of data
@@ -25,6 +23,18 @@ BEGIN
   DECLARE maxDaysToLookBackOnInitialQuery DEFAULT 65; # extra days from today to cover the delay in GA4 exporting data. No use in having it larger than partitionExpirationDays
 
   DECLARE datetogather DEFAULT CURRENT_TIMESTAMP(); # dummy value. gets updated before every use
+
+  CREATE SCHEMA IF NOT EXISTS tag_rocket
+  OPTIONS (
+    default_partition_expiration_days = 65,
+    description = 'Data for the Tag Rocket Report'
+  );
+
+  CREATE SCHEMA IF NOT EXISTS bq_logs
+  OPTIONS (
+    default_table_expiration_days = 65,
+    description = 'Destination for the Log Sink of billed queries'
+  );
 
   # meta data
   
