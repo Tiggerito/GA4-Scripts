@@ -715,8 +715,8 @@ BEGIN
     CREATE OR REPLACE TABLE `tag_rocket.query_logs` (
       day_timestamp TIMESTAMP,
       principal_email	STRING,
-      gb_billed INT64,
-    #  gb_processed INT64,
+      gb_billed FLOAT64,
+    #  gb_processed FLOAT64,
     #  query_count INT64,
       billed_query_count	INT64,
     error_count	INT64
