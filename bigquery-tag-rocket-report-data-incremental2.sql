@@ -58,8 +58,7 @@ BEGIN
       bigquery_project_id STRING,	
       ga4_account_id STRING,	
       ga4_property_id STRING,		
-      query_version	STRING,		
-      project_size_bytes	INT64,	
+      query_version	STRING,			
       last_run_timestamp	TIMESTAMP
     )
   OPTIONS (description = 'Version 4.2') # queryVersion
@@ -83,7 +82,6 @@ BEGIN
     '', # bigquery_project_id
     '', # ga4_account_id
     '', # ga4_property_id
-    0, # project_size_bytes
     '4.2', # query_version queryVersion
     CURRENT_TIMESTAMP() # last_run_timestamp
   ));
