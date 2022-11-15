@@ -36,6 +36,7 @@ BEGIN
     description = 'Destination for the Log Sink of billed queries'
   );
 
+
   # meta data
   
   CREATE OR REPLACE TABLE `tag_rocket.meta_data` (
@@ -58,6 +59,7 @@ BEGIN
       ga4_account_id STRING,	
       ga4_property_id STRING,		
       query_version	STRING,		
+      project_size_bytes	INT64,	
       last_run_timestamp	TIMESTAMP
     )
   OPTIONS (description = 'Version 4.2') # queryVersion
@@ -81,6 +83,7 @@ BEGIN
     '', # bigquery_project_id
     '', # ga4_account_id
     '', # ga4_property_id
+    0, # project_size_bytes
     '4.2', # query_version queryVersion
     CURRENT_TIMESTAMP() # last_run_timestamp
   ));
@@ -719,7 +722,9 @@ BEGIN
     #  gb_processed FLOAT64,
     #  query_count INT64,
       billed_query_count	INT64,
-    error_count	INT64
+    error_count	INT64,
+    gb_budget_trendline FLOAT64,
+    gb_rolling_total FLOAT64
     )
     PARTITION BY DATE(day_timestamp)
     OPTIONS (description = 'Version 4.2'); # queryVersion
@@ -750,21 +755,42 @@ BEGIN
       principal_email,
       gb_billed,
       billed_query_count,
-      error_count
+      error_count,
+      gb_budget_trendline
     )
     SELECT
       TIMESTAMP_TRUNC(timestamp, DAY) AS day_timestamp,
       protopayload_auditlog.authenticationInfo.principalEmail AS principal_email,
       SUM(protopayload_auditlog.servicedata_v1_bigquery.jobCompletedEvent.job.jobStatistics.totalBilledBytes/(1024*1024*1024)) AS gb_billed, 
-    #  SUM(protopayload_auditlog.servicedata_v1_bigquery.jobCompletedEvent.job.jobStatistics.totalProcessedBytes/(1024*1024*1024)) AS gb_processed,
+      #  SUM(protopayload_auditlog.servicedata_v1_bigquery.jobCompletedEvent.job.jobStatistics.totalProcessedBytes/(1024*1024*1024)) AS gb_processed,
       COUNT(1) AS billed_query_count,
-    #  COUNTIF(protopayload_auditlog.servicedata_v1_bigquery.jobCompletedEvent.job.jobStatistics.totalBilledBytes > 0) AS billed_query_count,
-    COUNTIF(protopayload_auditlog.servicedata_v1_bigquery.jobCompletedEvent.job.jobStatus.error.message IS NOT NULL) AS error_count
+      #  COUNTIF(protopayload_auditlog.servicedata_v1_bigquery.jobCompletedEvent.job.jobStatistics.totalBilledBytes > 0) AS billed_query_count,
+      COUNTIF(protopayload_auditlog.servicedata_v1_bigquery.jobCompletedEvent.job.jobStatus.error.message IS NOT NULL) AS error_count,
+      (EXTRACT(DAY FROM current_date()) * 1000) / EXTRACT(DAY FROM LAST_DAY(current_date())) AS gb_budget_trendline
     FROM
       `bq_logs.cloudaudit_googleapis_com_data_access_*`
     WHERE datetogather IS NULL OR TIMESTAMP_TRUNC(timestamp, DAY) >= datetogather
     GROUP BY 1, 2
     ORDER BY day_timestamp DESC, principal_email;
   END IF;
+
+  # rolling 31 day total
+  UPDATE `tag_rocket.query_logs` AS MAIN
+  SET gb_rolling_total = (SELECT 
+          SUM(gb_billed) 
+          FROM `tag_rocket.query_logs` AS SUB
+          WHERE SUB.day_timestamp <= MAIN.day_timestamp AND SUB.day_timestamp > DATE_SUB(MAIN.day_timestamp,INTERVAL 31 DAY) 
+        )
+  WHERE gb_rolling_total IS NULL;
+
+   # creating dummy data
+   # INSERT `tag_rocket.query_logs` (day_timestamp, gb_billed)
+   # VALUES(current_timestamp(), 10),
+   #     (DATE_SUB(current_timestamp(), INTERVAL 1 DAY), 20),
+   #     (DATE_SUB(current_timestamp(), INTERVAL 2 DAY), 30),
+   #     (DATE_SUB(current_timestamp(), INTERVAL 3 DAY), 15),
+   #     (DATE_SUB(current_timestamp(), INTERVAL 4 DAY), 25),
+   #     (DATE_SUB(current_timestamp(), INTERVAL 5 DAY), 20),
+   #     (DATE_SUB(current_timestamp(), INTERVAL 6 DAY), 40);
 
 END;
