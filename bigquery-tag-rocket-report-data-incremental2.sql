@@ -766,7 +766,7 @@ BEGIN
       COUNT(1) AS billed_query_count,
       #  COUNTIF(protopayload_auditlog.servicedata_v1_bigquery.jobCompletedEvent.job.jobStatistics.totalBilledBytes > 0) AS billed_query_count,
       COUNTIF(protopayload_auditlog.servicedata_v1_bigquery.jobCompletedEvent.job.jobStatus.error.message IS NOT NULL) AS error_count,
-      (EXTRACT(DAY FROM current_date()) * 1000) / EXTRACT(DAY FROM LAST_DAY(current_date())) AS budget_trendline_bytes
+      CAST((EXTRACT(DAY FROM current_date()) * 1000) / EXTRACT(DAY FROM LAST_DAY(current_date())) AS INT64) AS budget_trendline_bytes
     FROM
       `bq_logs.cloudaudit_googleapis_com_data_access_*`
     WHERE datetogather IS NULL OR TIMESTAMP_TRUNC(timestamp, DAY) >= datetogather
