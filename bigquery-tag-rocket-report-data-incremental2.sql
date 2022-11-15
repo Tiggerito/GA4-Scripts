@@ -722,9 +722,10 @@ BEGIN
     #  gb_processed FLOAT64,
     #  query_count INT64,
       billed_query_count	INT64,
-    error_count	INT64,
-    gb_budget_trendline FLOAT64,
-    gb_rolling_total FLOAT64
+      error_count	INT64,
+      gb_budget_trendline FLOAT64,
+      gb_rolling_total FLOAT64,
+      gb_month_to_date FLOAT64
     )
     PARTITION BY DATE(day_timestamp)
     OPTIONS (description = 'Version 4.2'); # queryVersion
@@ -782,6 +783,18 @@ BEGIN
           WHERE SUB.day_timestamp <= MAIN.day_timestamp AND SUB.day_timestamp > DATE_SUB(MAIN.day_timestamp,INTERVAL 31 DAY) 
         )
   WHERE gb_rolling_total IS NULL;
+
+  UPDATE `tag_rocket.query_logs` AS MAIN
+  SET gb_month_to_date = (SELECT 
+        SUM(gb_billed) 
+        FROM `tag_rocket.query_logs` AS SUB
+        WHERE SUB.day_timestamp <= MAIN.day_timestamp
+        AND 
+        EXTRACT(MONTH FROM SUB.day_timestamp) = EXTRACT(MONTH FROM MAIN.day_timestamp)
+        AND 
+        EXTRACT(YEAR FROM SUB.day_timestamp) = EXTRACT(YEAR FROM MAIN.day_timestamp)
+      )
+  WHERE gb_month_to_date IS NULL;
 
    # creating dummy data
    # INSERT `tag_rocket.query_logs` (day_timestamp, gb_billed)
