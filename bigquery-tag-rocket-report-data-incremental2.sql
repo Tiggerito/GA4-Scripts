@@ -18,21 +18,21 @@ BEGIN
   # If you are reaching your monthly free limit you could reduce the lookback at the risk of losing a bit of data
   # If you have plenty of alowance you could increase it. Probably no need to go beyond lookbackDays being 3 or 4.
 
-  # partitions will be deleted when older than 65 days, you can update this by searching for partitionExpirationDays and updating the number of days. NULL for never
+  # partitions and the bq_logs dataset will be deleted when older than 65 days, you can update this by searching for ExpirationDays and updating the number of days. NULL for never
 
-  DECLARE maxDaysToLookBackOnInitialQuery DEFAULT 65; # extra days from today to cover the delay in GA4 exporting data. No use in having it larger than partitionExpirationDays
+  DECLARE maxDaysToLookBackOnInitialQuery DEFAULT 65; # extra days from today to cover the delay in GA4 exporting data. No use in having it larger than ExpirationDays
 
   DECLARE datetogather DEFAULT CURRENT_TIMESTAMP(); # dummy value. gets updated before every use
 
   CREATE SCHEMA IF NOT EXISTS tag_rocket
   OPTIONS (
-    default_partition_expiration_days = 65,
+    default_partition_expiration_days = 65, # ExpirationDays
     description = 'Data for the Tag Rocket Report'
   );
 
   CREATE SCHEMA IF NOT EXISTS bq_logs
   OPTIONS (
-    default_table_expiration_days = 65,
+    default_table_expiration_days = 65, # ExpirationDays
     description = 'Destination for the Log Sink of billed queries'
   );
 
@@ -157,7 +157,7 @@ BEGIN
   END IF;
 
   ALTER TABLE `tag_rocket.web_vitals`
-  SET OPTIONS (partition_expiration_days = 65); # partitionExpirationDays
+  SET OPTIONS (partition_expiration_days = 65); # ExpirationDays
 
   # 10MB min per query makes this look expensive for small tables.
   SET datetogather = (SELECT TIMESTAMP_TRUNC(TIMESTAMP_ADD(MAX(PARSE_TIMESTAMP("%Y%m%d",event_date)), INTERVAL -lookbackDays DAY), DAY) FROM `tag_rocket.web_vitals`);
@@ -393,7 +393,7 @@ BEGIN
   END IF;
 
   ALTER TABLE `tag_rocket.purchases`
-  SET OPTIONS (partition_expiration_days = 65); # partitionExpirationDays
+  SET OPTIONS (partition_expiration_days = 65); # ExpirationDays
 
   # 10MB min per query makes this look expensive for small tables.
   SET datetogather = (SELECT TIMESTAMP_TRUNC(TIMESTAMP_ADD(MAX(PARSE_TIMESTAMP("%Y%m%d",event_date)), INTERVAL -lookbackDays DAY), DAY) FROM `tag_rocket.purchases`);
@@ -552,7 +552,7 @@ BEGIN
   END IF;
 
   ALTER TABLE `tag_rocket.website_errors`
-  SET OPTIONS (partition_expiration_days = 65); # partitionExpirationDays
+  SET OPTIONS (partition_expiration_days = 65); # ExpirationDays
 
   # 10MB min per query makes this look expensive for small tables.
   SET datetogather = (SELECT TIMESTAMP_TRUNC(TIMESTAMP_ADD(MAX(PARSE_TIMESTAMP("%Y%m%d",event_date)), INTERVAL -lookbackDays DAY), DAY) FROM `tag_rocket.website_errors`);
@@ -652,7 +652,7 @@ BEGIN
   END IF;
 
   ALTER TABLE `tag_rocket.missing_pages`
-  SET OPTIONS (partition_expiration_days = 65); # partitionExpirationDays
+  SET OPTIONS (partition_expiration_days = 65); # ExpirationDays
 
   SET datetogather = (SELECT TIMESTAMP_TRUNC(TIMESTAMP_ADD(MAX(PARSE_TIMESTAMP("%Y%m%d",event_date)), INTERVAL -lookbackDays DAY), DAY) FROM `tag_rocket.missing_pages`);
 
@@ -749,7 +749,8 @@ BEGIN
       day_timestamp,
       principal_email,
       gb_billed,
-      billed_query_count
+      billed_query_count,
+      error_count
     )
     SELECT
       TIMESTAMP_TRUNC(timestamp, DAY) AS day_timestamp,
