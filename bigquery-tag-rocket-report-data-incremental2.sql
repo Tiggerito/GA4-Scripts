@@ -716,14 +716,14 @@ BEGIN
     CREATE OR REPLACE TABLE `tag_rocket.query_logs` (
       day_timestamp TIMESTAMP,
       principal_email	STRING,
-      gb_billed FLOAT64,
-    #  gb_processed FLOAT64,
+      billed_bytes INT64,
+    #  processed_bytes INT64,
     #  query_count INT64,
       billed_query_count	INT64,
       error_count	INT64,
-      gb_budget_trendline FLOAT64,
-      gb_rolling_total FLOAT64,
-      gb_month_to_date FLOAT64
+      budget_trendline_bytes INT64,
+      rolling_total_bytes INT64,
+      month_to_date_bytes INT64
     )
     PARTITION BY DATE(day_timestamp)
     OPTIONS (description = 'Version 4.2'); # queryVersion
@@ -752,20 +752,21 @@ BEGIN
     (
       day_timestamp,
       principal_email,
-      gb_billed,
+      billed_bytes,
       billed_query_count,
       error_count,
-      gb_budget_trendline
+      budget_trendline_bytes
     )
     SELECT
       TIMESTAMP_TRUNC(timestamp, DAY) AS day_timestamp,
       protopayload_auditlog.authenticationInfo.principalEmail AS principal_email,
-      SUM(protopayload_auditlog.servicedata_v1_bigquery.jobCompletedEvent.job.jobStatistics.totalBilledBytes/(1024*1024*1024)) AS gb_billed, 
-      #  SUM(protopayload_auditlog.servicedata_v1_bigquery.jobCompletedEvent.job.jobStatistics.totalProcessedBytes/(1024*1024*1024)) AS gb_processed,
+      SUM(protopayload_auditlog.servicedata_v1_bigquery.jobCompletedEvent.job.jobStatistics.totalBilledBytes) AS billed_bytes, 
+      #SUM(protopayload_auditlog.servicedata_v1_bigquery.jobCompletedEvent.job.jobStatistics.totalBilledBytes) AS billed_bytes, 
+      #  SUM(protopayload_auditlog.servicedata_v1_bigquery.jobCompletedEvent.job.jobStatistics.totalProcessedBytes) AS processed_bytes,
       COUNT(1) AS billed_query_count,
       #  COUNTIF(protopayload_auditlog.servicedata_v1_bigquery.jobCompletedEvent.job.jobStatistics.totalBilledBytes > 0) AS billed_query_count,
       COUNTIF(protopayload_auditlog.servicedata_v1_bigquery.jobCompletedEvent.job.jobStatus.error.message IS NOT NULL) AS error_count,
-      (EXTRACT(DAY FROM current_date()) * 1000) / EXTRACT(DAY FROM LAST_DAY(current_date())) AS gb_budget_trendline
+      (EXTRACT(DAY FROM current_date()) * 1000) / EXTRACT(DAY FROM LAST_DAY(current_date())) AS budget_trendline_bytes
     FROM
       `bq_logs.cloudaudit_googleapis_com_data_access_*`
     WHERE datetogather IS NULL OR TIMESTAMP_TRUNC(timestamp, DAY) >= datetogather
@@ -775,16 +776,16 @@ BEGIN
 
   # rolling 31 day total
   UPDATE `tag_rocket.query_logs` AS MAIN
-  SET gb_rolling_total = (SELECT 
-          SUM(gb_billed) 
+  SET rolling_total_bytes = (SELECT 
+          SUM(billed_bytes) 
           FROM `tag_rocket.query_logs` AS SUB
           WHERE SUB.day_timestamp <= MAIN.day_timestamp AND SUB.day_timestamp > DATE_SUB(MAIN.day_timestamp,INTERVAL 31 DAY) 
         )
-  WHERE gb_rolling_total IS NULL;
+  WHERE rolling_total_bytes IS NULL;
 
   UPDATE `tag_rocket.query_logs` AS MAIN
-  SET gb_month_to_date = (SELECT 
-        SUM(gb_billed) 
+  SET month_to_date_bytes = (SELECT 
+        SUM(billed_bytes) 
         FROM `tag_rocket.query_logs` AS SUB
         WHERE SUB.day_timestamp <= MAIN.day_timestamp
         AND 
@@ -792,7 +793,11 @@ BEGIN
         AND 
         EXTRACT(YEAR FROM SUB.day_timestamp) = EXTRACT(YEAR FROM MAIN.day_timestamp)
       )
-  WHERE gb_month_to_date IS NULL;
+  WHERE month_to_date_bytes IS NULL;
+
+  # UPDATE `tag_rocket.query_logs` AS MAIN
+  # SET budget_trendline_bytes = (EXTRACT(DAY FROM day_timestamp) * 1000) / EXTRACT(DAY FROM LAST_DAY(day_timestamp)
+  # WHERE budget_trendline_bytes IS NULL;
 
    # creating dummy data
    # INSERT `tag_rocket.query_logs` (day_timestamp, gb_billed)
@@ -804,4 +809,5 @@ BEGIN
    #     (DATE_SUB(current_timestamp(), INTERVAL 5 DAY), 20),
    #     (DATE_SUB(current_timestamp(), INTERVAL 6 DAY), 40);
 
+#CONCATENATE("DATE_SUB(current_timestamp(), INTERVAL ", A2, " DAY), ", B2, "),")
 END;
