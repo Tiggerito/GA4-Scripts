@@ -1,4 +1,4 @@
-# Tag Rocket Report Data Incremental 2 v4.2
+# Tag Rocket Report Data Incremental 2 v4.3
 # https://github.com/Tiggerito/GA4-Scripts/blob/main/bigquery-tag-rocket-report-data-incremental2.sql
 
 # Replace all occurances of DatasetID with your Dataset ID for the GA4 export. Something like analytics_1234567890
@@ -61,7 +61,7 @@ BEGIN
       query_version	STRING,			
       last_run_timestamp	TIMESTAMP
     )
-  OPTIONS (description = 'Version 4.2') # queryVersion
+  OPTIONS (description = 'Version 4.3') # queryVersion
   AS  
   SELECT * FROM (SELECT AS VALUE STRUCT(
     '', # schedule_frequency: how frequently the query is scheduled to run. e.g. "monthly", "every Monday", "manually"
@@ -82,7 +82,7 @@ BEGIN
     '', # bigquery_project_id
     '', # ga4_account_id
     '', # ga4_property_id
-    '4.2', # query_version queryVersion
+    '4.3', # query_version queryVersion
     CURRENT_TIMESTAMP() # last_run_timestamp
   ));
 
@@ -114,7 +114,7 @@ BEGIN
     WHERE
       table_name = 'web_vitals'
       AND option_name = 'description'
-      AND option_value LIKE "%Version 4.2%" # queryVersion
+      AND option_value LIKE "%Version 4.3%" # queryVersion
   ) 
   THEN
     CREATE OR REPLACE TABLE `tag_rocket.web_vitals` (
@@ -154,7 +154,7 @@ BEGIN
     )
     PARTITION BY DATE(event_timestamp)
     CLUSTER BY metric_name
-    OPTIONS (description = 'Version 4.2');  # queryVersion
+    OPTIONS (description = 'Version 4.3');  # queryVersion
   END IF;
 
   ALTER TABLE `tag_rocket.web_vitals`
@@ -356,7 +356,7 @@ BEGIN
     WHERE
       table_name = 'purchases'
       AND option_name = 'description'
-      AND option_value LIKE "%Version 4.2%" # queryVersion
+      AND option_value LIKE "%Version 4.3%" # queryVersion
   ) 
   THEN
     CREATE OR REPLACE TABLE `tag_rocket.purchases` (
@@ -390,7 +390,7 @@ BEGIN
     )
     # or maybe month? each partition should be 1GB https://medium.com/dataseries/costs-and-performance-lessons-after-using-bigquery-with-terabytes-of-data-54a5809ac912
     PARTITION BY TIMESTAMP_TRUNC(event_timestamp, DAY)
-    OPTIONS (description = 'Version 4.2');  # queryVersion
+    OPTIONS (description = 'Version 4.3');  # queryVersion
   END IF;
 
   ALTER TABLE `tag_rocket.purchases`
@@ -520,7 +520,7 @@ BEGIN
     WHERE
       table_name = 'website_errors'
       AND option_name = 'description'
-      AND option_value LIKE "%Version 4.2%" # queryVersion
+      AND option_value LIKE "%Version 4.3%" # queryVersion
   ) 
   THEN
     CREATE OR REPLACE TABLE `tag_rocket.website_errors` (
@@ -549,7 +549,7 @@ BEGIN
     )
     # or maybe month? each partition should be 1GB https://medium.com/dataseries/costs-and-performance-lessons-after-using-bigquery-with-terabytes-of-data-54a5809ac912
     PARTITION BY TIMESTAMP_TRUNC(event_timestamp, DAY)
-    OPTIONS (description = 'Version 4.2');  # queryVersion
+    OPTIONS (description = 'Version 4.3');  # queryVersion
   END IF;
 
   ALTER TABLE `tag_rocket.website_errors`
@@ -630,7 +630,7 @@ BEGIN
     WHERE
       table_name = 'missing_pages'
       AND option_name = 'description'
-      AND option_value LIKE "%Version 4.2%" # queryVersion
+      AND option_value LIKE "%Version 4.3%" # queryVersion
   ) 
   THEN
     CREATE OR REPLACE TABLE `tag_rocket.missing_pages` (
@@ -649,7 +649,7 @@ BEGIN
     )
     # or maybe month? each partition should be 1GB https://medium.com/dataseries/costs-and-performance-lessons-after-using-bigquery-with-terabytes-of-data-54a5809ac912
     PARTITION BY TIMESTAMP_TRUNC(event_timestamp, DAY)
-    OPTIONS (description = 'Version 4.2'); # queryVersion
+    OPTIONS (description = 'Version 4.3'); # queryVersion
   END IF;
 
   ALTER TABLE `tag_rocket.missing_pages`
@@ -710,7 +710,7 @@ BEGIN
     WHERE
       table_name = 'query_logs'
       AND option_name = 'description'
-      AND option_value LIKE "%Version 4.2%" # queryVersion
+      AND option_value LIKE "%Version 4.3%" # queryVersion
   ) 
   THEN
     CREATE OR REPLACE TABLE `tag_rocket.query_logs` (
@@ -726,7 +726,7 @@ BEGIN
       month_to_date_bytes INT64
     )
     PARTITION BY DATE(day_timestamp)
-    OPTIONS (description = 'Version 4.2'); # queryVersion
+    OPTIONS (description = 'Version 4.3'); # queryVersion
   END IF;
 
   SET datetogather = (SELECT TIMESTAMP_TRUNC(TIMESTAMP_ADD(MAX(day_timestamp), INTERVAL -1 DAY), DAY) FROM `tag_rocket.query_logs`);
