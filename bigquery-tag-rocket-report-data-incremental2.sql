@@ -53,7 +53,7 @@ BEGIN
       notification3_title STRING,
       notification3_content STRING,
       notification3_type STRING,
-      last_exported_date	STRING,			     
+      last_exported	STRING,			     
       partition_expiration STRING,	
       bigquery_project_id STRING,	
       ga4_account_id STRING,	
@@ -77,7 +77,7 @@ BEGIN
     '', # notification3_title
     '', # notification3_content
     '', # notification3_type 
-    '', # last_exported_date: set when using Tag Rocket to run the query
+    '', # last_exported: set when using Tag Rocket to run the query. format '[yyyy-MM-dd]'
     '', # partition_expiration
     '', # bigquery_project_id
     '', # ga4_account_id
