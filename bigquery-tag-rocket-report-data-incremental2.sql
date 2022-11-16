@@ -766,7 +766,7 @@ BEGIN
       COUNT(1) AS billed_query_count,
       #  COUNTIF(protopayload_auditlog.servicedata_v1_bigquery.jobCompletedEvent.job.jobStatistics.totalBilledBytes > 0) AS billed_query_count,
       COUNTIF(protopayload_auditlog.servicedata_v1_bigquery.jobCompletedEvent.job.jobStatus.error.message IS NOT NULL) AS error_count,
-      CAST((EXTRACT(DAY FROM current_date()) * 1000) / EXTRACT(DAY FROM LAST_DAY(current_date())) AS INT64) AS budget_trendline_bytes
+      CAST((EXTRACT(DAY FROM CURRENT_DATE()) * 1000) / EXTRACT(DAY FROM LAST_DAY(CURRENT_DATE())) AS INT64) AS budget_trendline_bytes
     FROM
       `bq_logs.cloudaudit_googleapis_com_data_access_*`
     WHERE datetogather IS NULL OR TIMESTAMP_TRUNC(timestamp, DAY) >= datetogather
@@ -796,7 +796,7 @@ BEGIN
   WHERE month_to_date_bytes IS NULL;
 
   # UPDATE `tag_rocket.query_logs` AS MAIN
-  # SET budget_trendline_bytes = (EXTRACT(DAY FROM day_timestamp) * 1000) / EXTRACT(DAY FROM LAST_DAY(day_timestamp)
+  # SET budget_trendline_bytes = CAST((EXTRACT(DAY FROM day_timestamp) * 1000) / EXTRACT(DAY FROM LAST_DAY(EXTRACT(DATETIME FROM day_timestamp))) AS INT64)
   # WHERE budget_trendline_bytes IS NULL;
 
    # creating dummy data
