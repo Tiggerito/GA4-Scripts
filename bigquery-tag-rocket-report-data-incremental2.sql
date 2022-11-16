@@ -760,13 +760,10 @@ BEGIN
     SELECT
       TIMESTAMP_TRUNC(timestamp, DAY) AS day_timestamp,
       protopayload_auditlog.authenticationInfo.principalEmail AS principal_email,
-      SUM(protopayload_auditlog.servicedata_v1_bigquery.jobCompletedEvent.job.jobStatistics.totalBilledBytes) AS billed_bytes, 
-      #SUM(protopayload_auditlog.servicedata_v1_bigquery.jobCompletedEvent.job.jobStatistics.totalBilledBytes) AS billed_bytes, 
-      #  SUM(protopayload_auditlog.servicedata_v1_bigquery.jobCompletedEvent.job.jobStatistics.totalProcessedBytes) AS processed_bytes,
+      SUM(protopayload_auditlog.servicedata_v1_bigquery.jobCompletedEvent.job.jobStatistics.totalBilledBytes) AS billed_bytes,  
       COUNT(1) AS billed_query_count,
-      #  COUNTIF(protopayload_auditlog.servicedata_v1_bigquery.jobCompletedEvent.job.jobStatistics.totalBilledBytes > 0) AS billed_query_count,
       COUNTIF(protopayload_auditlog.servicedata_v1_bigquery.jobCompletedEvent.job.jobStatus.error.message IS NOT NULL) AS error_count,
-      CAST((EXTRACT(DAY FROM CURRENT_DATE()) * 1000) / EXTRACT(DAY FROM LAST_DAY(CURRENT_DATE())) AS INT64) AS budget_trendline_bytes
+      CAST((EXTRACT(DAY FROM CURRENT_DATE()) * 1000 * 1000 * 1000 * 1000) / EXTRACT(DAY FROM LAST_DAY(CURRENT_DATE())) AS INT64) AS budget_trendline_bytes
     FROM
       `bq_logs.cloudaudit_googleapis_com_data_access_*`
     WHERE datetogather IS NULL OR TIMESTAMP_TRUNC(timestamp, DAY) >= datetogather
