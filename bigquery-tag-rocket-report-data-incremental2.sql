@@ -1,7 +1,8 @@
 # Tag Rocket Report Data Incremental 2 v4.3
 # https://github.com/Tiggerito/GA4-Scripts/blob/main/bigquery-tag-rocket-report-data-incremental2.sql
 
-# Replace all occurances of DatasetID with your Dataset ID for the GA4 export. Something like analytics_1234567890
+# Replace all occurances of ${DatasetID} with your Dataset ID for the GA4 export. Something like analytics_1234567890
+# Replace all occurances of ${ProjectID} with your Project ID for the GA4 export.
 
 # make sure you run this using the same location as your analytics dataset
 
@@ -24,13 +25,13 @@ BEGIN
 
   DECLARE datetogather DEFAULT CURRENT_TIMESTAMP(); # dummy value. gets updated before every use
 
-  CREATE SCHEMA IF NOT EXISTS tag_rocket
+  CREATE SCHEMA IF NOT EXISTS ${ProjectID}.tag_rocket
   OPTIONS (
     default_partition_expiration_days = 65, # ExpirationDays
     description = 'Data for the Tag Rocket Report'
   );
 
-  CREATE SCHEMA IF NOT EXISTS bq_logs
+  CREATE SCHEMA IF NOT EXISTS ${ProjectID}.bq_logs
   OPTIONS (
     default_table_expiration_days = 65, # ExpirationDays
     description = 'Destination for the Log Sink of billed queries'
@@ -39,7 +40,7 @@ BEGIN
 
   # meta data
   
-  CREATE OR REPLACE TABLE `tag_rocket.meta_data` (
+  CREATE OR REPLACE TABLE `${ProjectID}.tag_rocket.meta_data` (
       schedule_frequency STRING,
       scheduled_by	STRING,
       store_front_name STRING,
@@ -110,14 +111,14 @@ BEGIN
     SELECT
       1
     FROM
-      `tag_rocket.INFORMATION_SCHEMA.TABLE_OPTIONS`
+      `${ProjectID}.tag_rocket.INFORMATION_SCHEMA.TABLE_OPTIONS`
     WHERE
       table_name = 'web_vitals'
       AND option_name = 'description'
       AND option_value LIKE "%Version 4.3%" # queryVersion
   ) 
   THEN
-    CREATE OR REPLACE TABLE `tag_rocket.web_vitals` (
+    CREATE OR REPLACE TABLE `${ProjectID}.tag_rocket.web_vitals` (
       last_updated TIMESTAMP,
       user_pseudo_id	STRING,
       call_timestamp TIMESTAMP,
@@ -157,21 +158,21 @@ BEGIN
     OPTIONS (description = 'Version 4.3');  # queryVersion
   END IF;
 
-  ALTER TABLE `tag_rocket.web_vitals`
+  ALTER TABLE `${ProjectID}.tag_rocket.web_vitals`
   SET OPTIONS (partition_expiration_days = 65); # ExpirationDays
 
   # 10MB min per query makes this look expensive for small tables.
-  SET datetogather = (SELECT TIMESTAMP_TRUNC(TIMESTAMP_ADD(MAX(PARSE_TIMESTAMP("%Y%m%d",event_date)), INTERVAL -lookbackDays DAY), DAY) FROM `tag_rocket.web_vitals`);
+  SET datetogather = (SELECT TIMESTAMP_TRUNC(TIMESTAMP_ADD(MAX(PARSE_TIMESTAMP("%Y%m%d",event_date)), INTERVAL -lookbackDays DAY), DAY) FROM `${ProjectID}.tag_rocket.web_vitals`);
 
   IF datetogather IS NOT NULL THEN
-    DELETE FROM `tag_rocket.web_vitals` WHERE PARSE_TIMESTAMP("%Y%m%d",event_date) >= datetogather;
+    DELETE FROM `${ProjectID}.tag_rocket.web_vitals` WHERE PARSE_TIMESTAMP("%Y%m%d",event_date) >= datetogather;
   ELSE
     IF maxDaysToLookBackOnInitialQuery IS NOT NULL THEN
       SET datetogather = TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL maxDaysToLookBackOnInitialQuery DAY);
     END IF;
   END IF;
 
-  INSERT `tag_rocket.web_vitals` 
+  INSERT `${ProjectID}.tag_rocket.web_vitals` 
   (    
     last_updated,
     ga_session_id,
@@ -328,7 +329,7 @@ BEGIN
                   ANY_VALUE((SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'width')) AS width,
                   ANY_VALUE((SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'height')) AS height
               FROM
-                `DatasetID.events_*`
+                `${ProjectID}.${DatasetID}.events_*`
               WHERE
                 event_name IN ('LCP', 'FID', 'CLS', 'TTFB', 'FCP', 'INP', 'first_visit', 'purchase')
                 # Gather one more day than datetogather so we get cross midnight joins working
@@ -352,14 +353,14 @@ BEGIN
     SELECT
       1
     FROM
-      `tag_rocket.INFORMATION_SCHEMA.TABLE_OPTIONS`
+      `${ProjectID}.tag_rocket.INFORMATION_SCHEMA.TABLE_OPTIONS`
     WHERE
       table_name = 'purchases'
       AND option_name = 'description'
       AND option_value LIKE "%Version 4.3%" # queryVersion
   ) 
   THEN
-    CREATE OR REPLACE TABLE `tag_rocket.purchases` (
+    CREATE OR REPLACE TABLE `${ProjectID}.tag_rocket.purchases` (
       last_updated TIMESTAMP,
       user_pseudo_id	STRING,
       call_timestamp TIMESTAMP,
@@ -393,21 +394,21 @@ BEGIN
     OPTIONS (description = 'Version 4.3');  # queryVersion
   END IF;
 
-  ALTER TABLE `tag_rocket.purchases`
+  ALTER TABLE `${ProjectID}.tag_rocket.purchases`
   SET OPTIONS (partition_expiration_days = 65); # ExpirationDays
 
   # 10MB min per query makes this look expensive for small tables.
-  SET datetogather = (SELECT TIMESTAMP_TRUNC(TIMESTAMP_ADD(MAX(PARSE_TIMESTAMP("%Y%m%d",event_date)), INTERVAL -lookbackDays DAY), DAY) FROM `tag_rocket.purchases`);
+  SET datetogather = (SELECT TIMESTAMP_TRUNC(TIMESTAMP_ADD(MAX(PARSE_TIMESTAMP("%Y%m%d",event_date)), INTERVAL -lookbackDays DAY), DAY) FROM `${ProjectID}.tag_rocket.purchases`);
 
   IF datetogather IS NOT NULL THEN
-    DELETE FROM `tag_rocket.purchases` WHERE PARSE_TIMESTAMP("%Y%m%d",event_date) >= datetogather;
+    DELETE FROM `${ProjectID}.tag_rocket.purchases` WHERE PARSE_TIMESTAMP("%Y%m%d",event_date) >= datetogather;
   ELSE
     IF maxDaysToLookBackOnInitialQuery IS NOT NULL THEN
       SET datetogather = TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL maxDaysToLookBackOnInitialQuery DAY);
     END IF;
   END IF;
 
- INSERT `tag_rocket.purchases`  
+ INSERT `${ProjectID}.tag_rocket.purchases`  
   (
       last_updated,
       user_pseudo_id,
@@ -488,7 +489,7 @@ BEGIN
       ANY_VALUE(traffic_source.source) AS traffic_source, 
       ANY_VALUE(user_ltv.revenue) AS user_ltv_revenue, 
       ANY_VALUE(user_ltv.currency) AS user_ltv_currency
-    FROM `DatasetID.events_*` 
+    FROM `${ProjectID}.${DatasetID}.events_*` 
     WHERE event_name = 'purchase'
     AND (datetogather IS NULL OR _table_suffix BETWEEN FORMAT_DATE('%Y%m%d',DATE_SUB(datetogather, INTERVAL 1 DAY)) AND FORMAT_DATE('%Y%m%d',CURRENT_DATE())) # one more day than datetogather so we get cross midnight joins working. 
     GROUP BY purchase_transaction_id
@@ -501,7 +502,7 @@ BEGIN
       ANY_VALUE((SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'method')) AS server_purchase_method,
       COUNT(*) AS server_purchase_events,
       MAX(event_date) AS server_purchase_event_date,
-    FROM `DatasetID.events_*` 
+    FROM `${ProjectID}.${DatasetID}.events_*` 
     WHERE event_name = 'server_purchase'
     AND (datetogather IS NULL OR _table_suffix BETWEEN FORMAT_DATE('%Y%m%d',DATE_SUB(datetogather, INTERVAL 1 DAY)) AND FORMAT_DATE('%Y%m%d',CURRENT_DATE())) # one more day than datetogather so we get cross midnight joins working. 
     GROUP BY server_purchase_transaction_id
@@ -516,14 +517,14 @@ BEGIN
     SELECT
       1
     FROM
-      `tag_rocket.INFORMATION_SCHEMA.TABLE_OPTIONS`
+      `${ProjectID}.tag_rocket.INFORMATION_SCHEMA.TABLE_OPTIONS`
     WHERE
       table_name = 'website_errors'
       AND option_name = 'description'
       AND option_value LIKE "%Version 4.3%" # queryVersion
   ) 
   THEN
-    CREATE OR REPLACE TABLE `tag_rocket.website_errors` (
+    CREATE OR REPLACE TABLE `${ProjectID}.tag_rocket.website_errors` (
       last_updated TIMESTAMP,
       user_pseudo_id	STRING,
       call_timestamp TIMESTAMP,
@@ -552,21 +553,21 @@ BEGIN
     OPTIONS (description = 'Version 4.3');  # queryVersion
   END IF;
 
-  ALTER TABLE `tag_rocket.website_errors`
+  ALTER TABLE `${ProjectID}.tag_rocket.website_errors`
   SET OPTIONS (partition_expiration_days = 65); # ExpirationDays
 
   # 10MB min per query makes this look expensive for small tables.
-  SET datetogather = (SELECT TIMESTAMP_TRUNC(TIMESTAMP_ADD(MAX(PARSE_TIMESTAMP("%Y%m%d",event_date)), INTERVAL -lookbackDays DAY), DAY) FROM `tag_rocket.website_errors`);
+  SET datetogather = (SELECT TIMESTAMP_TRUNC(TIMESTAMP_ADD(MAX(PARSE_TIMESTAMP("%Y%m%d",event_date)), INTERVAL -lookbackDays DAY), DAY) FROM `${ProjectID}.tag_rocket.website_errors`);
 
   IF datetogather IS NOT NULL THEN
-    DELETE FROM `tag_rocket.website_errors` WHERE PARSE_TIMESTAMP("%Y%m%d",event_date) >= datetogather;
+    DELETE FROM `${ProjectID}.tag_rocket.website_errors` WHERE PARSE_TIMESTAMP("%Y%m%d",event_date) >= datetogather;
   ELSE
     IF maxDaysToLookBackOnInitialQuery IS NOT NULL THEN
       SET datetogather = TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL maxDaysToLookBackOnInitialQuery DAY);
     END IF;
   END IF;
 
-  INSERT `tag_rocket.website_errors` 
+  INSERT `${ProjectID}.tag_rocket.website_errors` 
   (
     last_updated,
     user_pseudo_id,
@@ -614,7 +615,7 @@ BEGIN
     (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'error_lineno') AS error_lineno,
     (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'error_colno') AS error_colno,
     (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'error_object_type') AS error_object_type
-  FROM `DatasetID.events_*` 
+  FROM `${ProjectID}.${DatasetID}.events_*` 
   WHERE event_name = 'exception'
   #AND (datetogather IS NULL OR TIMESTAMP_TRUNC(TIMESTAMP_MICROS(event_timestamp), DAY) > datetogather)
   AND (datetogather IS NULL OR _table_suffix BETWEEN FORMAT_DATE('%Y%m%d',datetogather) AND FORMAT_DATE('%Y%m%d',CURRENT_DATE()));
@@ -626,14 +627,14 @@ BEGIN
     SELECT
       1
     FROM
-      `tag_rocket.INFORMATION_SCHEMA.TABLE_OPTIONS`
+      `${ProjectID}.tag_rocket.INFORMATION_SCHEMA.TABLE_OPTIONS`
     WHERE
       table_name = 'missing_pages'
       AND option_name = 'description'
       AND option_value LIKE "%Version 4.3%" # queryVersion
   ) 
   THEN
-    CREATE OR REPLACE TABLE `tag_rocket.missing_pages` (
+    CREATE OR REPLACE TABLE `${ProjectID}.tag_rocket.missing_pages` (
       last_updated TIMESTAMP,
       user_pseudo_id	STRING,
       call_timestamp TIMESTAMP,
@@ -652,20 +653,20 @@ BEGIN
     OPTIONS (description = 'Version 4.3'); # queryVersion
   END IF;
 
-  ALTER TABLE `tag_rocket.missing_pages`
+  ALTER TABLE `${ProjectID}.tag_rocket.missing_pages`
   SET OPTIONS (partition_expiration_days = 65); # ExpirationDays
 
-  SET datetogather = (SELECT TIMESTAMP_TRUNC(TIMESTAMP_ADD(MAX(PARSE_TIMESTAMP("%Y%m%d",event_date)), INTERVAL -lookbackDays DAY), DAY) FROM `tag_rocket.missing_pages`);
+  SET datetogather = (SELECT TIMESTAMP_TRUNC(TIMESTAMP_ADD(MAX(PARSE_TIMESTAMP("%Y%m%d",event_date)), INTERVAL -lookbackDays DAY), DAY) FROM `${ProjectID}.tag_rocket.missing_pages`);
 
   IF datetogather IS NOT NULL THEN
-    DELETE FROM `tag_rocket.missing_pages` WHERE PARSE_TIMESTAMP("%Y%m%d",event_date) >= datetogather;
+    DELETE FROM `${ProjectID}.tag_rocket.missing_pages` WHERE PARSE_TIMESTAMP("%Y%m%d",event_date) >= datetogather;
   ELSE
     IF maxDaysToLookBackOnInitialQuery IS NOT NULL THEN
       SET datetogather = TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL maxDaysToLookBackOnInitialQuery DAY);
     END IF;
   END IF;
 
-  INSERT `tag_rocket.missing_pages` 
+  INSERT `${ProjectID}.tag_rocket.missing_pages` 
   (
     last_updated,
     user_pseudo_id,
@@ -696,7 +697,7 @@ BEGIN
     (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'page_location') AS page_location,
     (SELECT COALESCE(value.string_value, CAST(value.int_value AS STRING)) FROM UNNEST(event_params) WHERE key = 'page_type') AS page_type,
     (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'page_referrer') AS page_referrer
-  FROM `DatasetID.events_*` 
+  FROM `${ProjectID}.${DatasetID}.events_*` 
   WHERE event_name = 'page_view'
   AND (datetogather IS NULL OR _table_suffix BETWEEN FORMAT_DATE('%Y%m%d',datetogather) AND FORMAT_DATE('%Y%m%d',CURRENT_DATE()));
  
@@ -706,14 +707,14 @@ BEGIN
     SELECT
       1
     FROM
-      `tag_rocket.INFORMATION_SCHEMA.TABLE_OPTIONS`
+      `${ProjectID}.tag_rocket.INFORMATION_SCHEMA.TABLE_OPTIONS`
     WHERE
       table_name = 'query_logs'
       AND option_name = 'description'
       AND option_value LIKE "%Version 4.3%" # queryVersion
   ) 
   THEN
-    CREATE OR REPLACE TABLE `tag_rocket.query_logs` (
+    CREATE OR REPLACE TABLE `${ProjectID}.tag_rocket.query_logs` (
       day_timestamp TIMESTAMP,
       principal_email	STRING,
       billed_bytes INT64,
@@ -729,10 +730,10 @@ BEGIN
     OPTIONS (description = 'Version 4.3'); # queryVersion
   END IF;
 
-  SET datetogather = (SELECT TIMESTAMP_TRUNC(TIMESTAMP_ADD(MAX(day_timestamp), INTERVAL -1 DAY), DAY) FROM `tag_rocket.query_logs`);
+  SET datetogather = (SELECT TIMESTAMP_TRUNC(TIMESTAMP_ADD(MAX(day_timestamp), INTERVAL -1 DAY), DAY) FROM `${ProjectID}.tag_rocket.query_logs`);
 
   IF datetogather IS NOT NULL THEN
-    DELETE FROM `tag_rocket.query_logs` WHERE day_timestamp >= datetogather;
+    DELETE FROM `${ProjectID}.tag_rocket.query_logs` WHERE day_timestamp >= datetogather;
   ELSE
     IF maxDaysToLookBackOnInitialQuery IS NOT NULL THEN
       SET datetogather = TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL maxDaysToLookBackOnInitialQuery DAY);
@@ -743,12 +744,12 @@ BEGIN
     SELECT
       1
     FROM
-      `bq_logs.INFORMATION_SCHEMA.TABLE_OPTIONS`
+      `${ProjectID}.bq_logs.INFORMATION_SCHEMA.TABLE_OPTIONS`
     WHERE
       table_name LIKE "cloudaudit_googleapis_com_data_access_%"
   ) 
   THEN
-    INSERT `tag_rocket.query_logs` 
+    INSERT `${ProjectID}.tag_rocket.query_logs` 
     (
       day_timestamp,
       principal_email,
@@ -765,25 +766,25 @@ BEGIN
       COUNTIF(protopayload_auditlog.servicedata_v1_bigquery.jobCompletedEvent.job.jobStatus.error.message IS NOT NULL) AS error_count,
       CAST((EXTRACT(DAY FROM CURRENT_DATE()) * 1000 * 1000 * 1000 * 1000) / EXTRACT(DAY FROM LAST_DAY(CURRENT_DATE())) AS INT64) AS budget_trendline_bytes
     FROM
-      `bq_logs.cloudaudit_googleapis_com_data_access_*`
+      `${ProjectID}.bq_logs.cloudaudit_googleapis_com_data_access_*`
     WHERE datetogather IS NULL OR TIMESTAMP_TRUNC(timestamp, DAY) >= datetogather
     GROUP BY 1, 2
     ORDER BY day_timestamp DESC, principal_email;
   END IF;
 
   # rolling 31 day total
-  UPDATE `tag_rocket.query_logs` AS MAIN
+  UPDATE `${ProjectID}.tag_rocket.query_logs` AS MAIN
   SET rolling_total_bytes = (SELECT 
           SUM(billed_bytes) 
-          FROM `tag_rocket.query_logs` AS SUB
+          FROM `${ProjectID}.tag_rocket.query_logs` AS SUB
           WHERE SUB.day_timestamp <= MAIN.day_timestamp AND SUB.day_timestamp > DATE_SUB(MAIN.day_timestamp,INTERVAL 31 DAY) 
         )
   WHERE rolling_total_bytes IS NULL;
 
-  UPDATE `tag_rocket.query_logs` AS MAIN
+  UPDATE `${ProjectID}.tag_rocket.query_logs` AS MAIN
   SET month_to_date_bytes = (SELECT 
         SUM(billed_bytes) 
-        FROM `tag_rocket.query_logs` AS SUB
+        FROM `${ProjectID}.tag_rocket.query_logs` AS SUB
         WHERE SUB.day_timestamp <= MAIN.day_timestamp
         AND 
         EXTRACT(MONTH FROM SUB.day_timestamp) = EXTRACT(MONTH FROM MAIN.day_timestamp)
@@ -792,12 +793,12 @@ BEGIN
       )
   WHERE month_to_date_bytes IS NULL;
 
-  # UPDATE `tag_rocket.query_logs` AS MAIN
+  # UPDATE `${ProjectID}.tag_rocket.query_logs` AS MAIN
   # SET budget_trendline_bytes = CAST((EXTRACT(DAY FROM day_timestamp) * 1000) / EXTRACT(DAY FROM LAST_DAY(EXTRACT(DATETIME FROM day_timestamp))) AS INT64)
   # WHERE budget_trendline_bytes IS NULL;
 
    # creating dummy data
-   # INSERT `tag_rocket.query_logs` (day_timestamp, gb_billed)
+   # INSERT `${ProjectID}.tag_rocket.query_logs` (day_timestamp, gb_billed)
    # VALUES(current_timestamp(), 10),
    #     (DATE_SUB(current_timestamp(), INTERVAL 1 DAY), 20),
    #     (DATE_SUB(current_timestamp(), INTERVAL 2 DAY), 30),
