@@ -25,13 +25,13 @@ BEGIN
 
   DECLARE datetogather DEFAULT CURRENT_TIMESTAMP(); # dummy value. gets updated before every use
 
-  CREATE SCHEMA IF NOT EXISTS ${ProjectID}.tag_rocket
+  CREATE SCHEMA IF NOT EXISTS `${ProjectID}.tag_rocket
   OPTIONS (
     default_partition_expiration_days = 65, # ExpirationDays
     description = 'Data for the Tag Rocket Report'
   );
 
-  CREATE SCHEMA IF NOT EXISTS ${ProjectID}.bq_logs
+  CREATE SCHEMA IF NOT EXISTS `${ProjectID}.bq_logs`
   OPTIONS (
     default_table_expiration_days = 65, # ExpirationDays
     description = 'Destination for the Log Sink of billed queries'
