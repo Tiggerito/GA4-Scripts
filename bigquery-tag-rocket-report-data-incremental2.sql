@@ -25,7 +25,7 @@ BEGIN
 
   DECLARE datetogather DEFAULT CURRENT_TIMESTAMP(); # dummy value. gets updated before every use
 
-  CREATE SCHEMA IF NOT EXISTS `${ProjectID}.tag_rocket
+  CREATE SCHEMA IF NOT EXISTS `${ProjectID}.tag_rocket`
   OPTIONS (
     default_partition_expiration_days = 65, # ExpirationDays
     description = 'Data for the Tag Rocket Report'
