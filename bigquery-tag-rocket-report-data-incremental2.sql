@@ -6,6 +6,8 @@
 
 # make sure you run this using the same location as your analytics dataset
 
+# this query will delete an recreate tables if they are for an older verios. Which means historical data may be lost.
+
 BEGIN
   # The first run with gather all data. After that it will gather new data and merge the last 3 days of data
 
@@ -728,6 +730,9 @@ BEGIN
     )
     PARTITION BY DATE(day_timestamp)
     OPTIONS (description = 'Version 4.3'); # queryVersion
+
+    INSERT `${ProjectID}.tag_rocket.query_logs` (day_timestamp, principal_email, billed_bytes, billed_query_count, error_count, budget_trendline_bytes, rolling_total_bytes, month_to_date_bytes)
+  VALUES(current_timestamp(), '',0,0,0,0,0,0);
   END IF;
 
   SET datetogather = (SELECT TIMESTAMP_TRUNC(TIMESTAMP_ADD(MAX(day_timestamp), INTERVAL -1 DAY), DAY) FROM `${ProjectID}.tag_rocket.query_logs`);
