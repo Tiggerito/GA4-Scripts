@@ -274,10 +274,8 @@ BEGIN
           FROM
             (
               SELECT
-                (SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'ga_session_id')
-                  AS ga_session_id,
-                (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'metric_id')
-                  AS metric_id,
+                (SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'ga_session_id') AS ga_session_id, # can be null in consent mode making grouping bad ?
+                (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'metric_id') AS metric_id,
 
                 SAFE.TIMESTAMP_MICROS(ANY_VALUE((SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'call_timestamp'))) AS call_timestamp,
                 ANY_VALUE((SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'call_sequence')) AS call_sequence,
@@ -342,7 +340,7 @@ BEGIN
         )
       WHERE
         ga_session_id IS NOT NULL
-      GROUP BY ga_session_id
+      GROUP BY ga_session_id # can be null in consent mode making grouping bad ?
     )
   CROSS JOIN UNNEST(events) AS evt
   WHERE evt.event_name NOT IN ('first_visit', 'purchase')
@@ -732,7 +730,7 @@ BEGIN
     OPTIONS (description = 'Version 4.3'); # queryVersion
 
     INSERT `${ProjectID}.tag_rocket.query_logs` (day_timestamp, principal_email, billed_bytes, billed_query_count, error_count, budget_trendline_bytes, rolling_total_bytes, month_to_date_bytes)
-  VALUES(current_timestamp(), '',0,0,0,0,0,0);
+  VALUES(current_timestamp(),'',0,0,0,0,0,0);
   END IF;
 
   SET datetogather = (SELECT TIMESTAMP_TRUNC(TIMESTAMP_ADD(MAX(day_timestamp), INTERVAL -1 DAY), DAY) FROM `${ProjectID}.tag_rocket.query_logs`);

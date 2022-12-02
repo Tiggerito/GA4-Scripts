@@ -224,7 +224,7 @@ BEGIN
     WHERE evt.event_name NOT IN ('first_visit', 'purchase')
   ) B
   ON 
-    ((A.user_pseudo_id IS NULL AND B.user_pseudo_id IS NULL) OR (A.user_pseudo_id = B.user_pseudo_id))
+    ((A.user_pseudo_id IS NULL AND B.user_pseudo_id IS NULL) OR (A.user_pseudo_id = B.user_pseudo_id)) # can be null in consent mode
     AND ((A.call_timestamp IS NULL AND B.call_timestamp IS NULL) OR (A.call_timestamp = B.call_timestamp))
     AND ((A.call_sequence IS NULL AND B.call_sequence IS NULL) OR (A.call_sequence = B.call_sequence))
     AND A.event_timestamp = B.event_timestamp # backup
@@ -429,7 +429,7 @@ BEGIN
     ON purchase_transaction_id = server_purchase_transaction_id
   ) B
   ON 
-    ((A.user_pseudo_id IS NULL AND B.user_pseudo_id IS NULL) OR (A.user_pseudo_id = B.user_pseudo_id))
+    ((A.user_pseudo_id IS NULL AND B.user_pseudo_id IS NULL) OR (A.user_pseudo_id = B.user_pseudo_id)) # can be null in consent mode
     AND ((A.call_timestamp IS NULL AND B.call_timestamp IS NULL) OR (A.call_timestamp = B.call_timestamp))
     AND ((A.call_sequence IS NULL AND B.call_sequence IS NULL) OR (A.call_sequence = B.call_sequence))
     AND ((A.event_timestamp IS NULL AND B.event_timestamp IS NULL) OR (A.event_timestamp = B.event_timestamp)) 
@@ -580,7 +580,7 @@ BEGIN
     AND (datetogather IS NULL OR _table_suffix BETWEEN FORMAT_DATE('%Y%m%d',datetogather) AND FORMAT_DATE('%Y%m%d',DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY)))
   ) B
   ON 
-    ((A.user_pseudo_id IS NULL AND B.user_pseudo_id IS NULL) OR (A.user_pseudo_id = B.user_pseudo_id))
+    ((A.user_pseudo_id IS NULL AND B.user_pseudo_id IS NULL) OR (A.user_pseudo_id = B.user_pseudo_id)) # can be null in consent mode
     AND ((A.call_timestamp IS NULL AND B.call_timestamp IS NULL) OR (A.call_timestamp = B.call_timestamp))
     AND ((A.call_sequence IS NULL AND B.call_sequence IS NULL) OR (A.call_sequence = B.call_sequence))
     AND A.event_timestamp = B.event_timestamp # backup
@@ -698,7 +698,7 @@ BEGIN
     AND (datetogather IS NULL OR _table_suffix BETWEEN FORMAT_DATE('%Y%m%d',datetogather) AND FORMAT_DATE('%Y%m%d',DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY)))
   ) B
   ON 
-    ((A.user_pseudo_id IS NULL AND B.user_pseudo_id IS NULL) OR (A.user_pseudo_id = B.user_pseudo_id))
+    ((A.user_pseudo_id IS NULL AND B.user_pseudo_id IS NULL) OR (A.user_pseudo_id = B.user_pseudo_id)) # can be null in consent mode
     AND ((A.call_timestamp IS NULL AND B.call_timestamp IS NULL) OR (A.call_timestamp = B.call_timestamp))
     AND ((A.call_sequence IS NULL AND B.call_sequence IS NULL) OR (A.call_sequence = B.call_sequence))
     AND A.event_timestamp = B.event_timestamp # backup

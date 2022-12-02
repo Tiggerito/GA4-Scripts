@@ -75,10 +75,8 @@ FROM
         FROM
           (
             SELECT
-              (SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'ga_session_id')
-                AS ga_session_id,
-              (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'metric_id')
-                AS metric_id,
+              (SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'ga_session_id') AS ga_session_id, # can be null in consent mode
+              (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'metric_id') AS metric_id,
               ANY_VALUE(device.category) AS device_category,
               ANY_VALUE(device.operating_system) AS device_os,
               ANY_VALUE(traffic_source.medium) AS traffic_medium,
@@ -140,7 +138,7 @@ FROM
       )
     WHERE
       ga_session_id IS NOT NULL
-    GROUP BY ga_session_id
+    GROUP BY ga_session_id # can be null in consent mode ?
   )
 CROSS JOIN UNNEST(events) AS evt
 WHERE evt.event_name NOT IN ('first_visit', 'purchase');
