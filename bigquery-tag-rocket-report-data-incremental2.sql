@@ -716,14 +716,15 @@ BEGIN
   ) 
   THEN
     CREATE OR REPLACE TABLE `${ProjectID}.tag_rocket.user_sessions` (
-      last_updated TIMESTAMP,
       user_pseudo_id STRING,
       ga_session_id INT64,
+      last_updated TIMESTAMP,
       session_date STRING,
       session_start_timestamp TIMESTAMP,
       session_end_timestamp TIMESTAMP,
       user_id STRING,
       session_first_visit INT64,
+      session_first_purchase INT64,
       session_page_view_count INT64,
       session_view_item_list_count INT64,
       session_view_item_count INT64,
@@ -789,6 +790,7 @@ BEGIN
       session_end_timestamp,
       user_id,
       session_first_visit,
+      session_first_purchase,
       session_page_view_count,
       session_view_item_list_count,
       session_view_item_count,
