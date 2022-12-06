@@ -1,4 +1,4 @@
-# Tag Rocket Report Data Incremental 2 v4.3
+# Tag Rocket Report Data Incremental 2 v4.4
 # https://github.com/Tiggerito/GA4-Scripts/blob/main/bigquery-tag-rocket-report-data-incremental2.sql
 
 # Replace all occurances of ${DatasetID} with your Dataset ID for the GA4 export. Something like analytics_1234567890
@@ -712,7 +712,7 @@ BEGIN
     WHERE
       table_name = 'user_sessions'
       AND option_name = 'description'
-      AND option_value LIKE "%Version 4.3%" # queryVersion
+      AND option_value LIKE "%Version 4.4%" # queryVersion
   ) 
   THEN
     CREATE OR REPLACE TABLE `${ProjectID}.tag_rocket.user_sessions` (
@@ -763,7 +763,7 @@ BEGIN
       user_first_timestamp	TIMESTAMP
     )
     PARTITION BY TIMESTAMP_TRUNC(session_start_timestamp, DAY)
-    OPTIONS (description = 'Version 4.3'); # queryVersion
+    OPTIONS (description = 'Version 4.4'); # queryVersion
   END IF;
 
   ALTER TABLE `${ProjectID}.tag_rocket.user_sessions`
