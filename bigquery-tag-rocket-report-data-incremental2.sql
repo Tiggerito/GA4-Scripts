@@ -291,7 +291,7 @@ BEGIN
                     (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'page_location'),
                     r'^[^?]+')) AS page_path,
                 
-                ARRAY_TO_STRING([(SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'debug_target')), (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'debug_target2'))], '') AS debug_target,
+                ARRAY_TO_STRING([ANY_VALUE((SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'debug_target')), ANY_VALUE((SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'debug_target2'))], '') AS debug_target,
                 # ANY_VALUE(
                 #   (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'debug_target'))
                 #   AS debug_target,
