@@ -251,7 +251,8 @@ BEGIN
               traffic_name,
               traffic_source,
               page_path,
-              IF(debug_target2 IS NULL, debug_target, CONCAT(debug_target, debug_target2)) AS debug_target,
+              debug_target,
+              #IF(debug_target2 IS NULL, debug_target, CONCAT(debug_target, debug_target2)) AS debug_target,
               event_timestamp,
               event_date,
               event_name,
@@ -290,12 +291,13 @@ BEGIN
                     (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'page_location'),
                     r'^[^?]+')) AS page_path,
                 
-                ANY_VALUE(
-                  (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'debug_target'))
-                  AS debug_target,
-                ANY_VALUE(
-                  (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'debug_target2'))
-                  AS debug_target2,
+                ARRAY_TO_STRING([(SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'debug_target')), (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'debug_target2'))], '') AS debug_target,
+                # ANY_VALUE(
+                #   (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'debug_target'))
+                #   AS debug_target,
+                # ANY_VALUE(
+                #   (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'debug_target2'))
+                #   AS debug_target2,
                 ANY_VALUE(user_pseudo_id) AS user_pseudo_id,
                 ANY_VALUE(geo.country) AS country,
                 ANY_VALUE(event_name) AS event_name,
@@ -886,10 +888,9 @@ BEGIN
     ANY_VALUE(traffic_source.name)	AS user_campaign,
     ANY_VALUE(traffic_source.medium)	AS user_medium,
     ANY_VALUE(traffic_source.source)	AS user_source,
-
-    ANY_VALUE((SELECT value.string_value FROM UNNEST(user_properties) WHERE key = 'referrer')) AS user_referrer,
-    ANY_VALUE((SELECT value.string_value FROM UNNEST(user_properties) WHERE key = 'landing_page')) AS user_landing_page,
-    ANY_VALUE((SELECT value.string_value FROM UNNEST(user_properties) WHERE key = 'landing_page_type')) AS user_landing_page_type,
+    ARRAY_TO_STRING([ANY_VALUE((SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'initial_referrer')),ANY_VALUE((SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'initial_referrer2'))], '') AS user_referrer,
+    ARRAY_TO_STRING([ANY_VALUE((SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'initial_landing_page')),ANY_VALUE((SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'initial_landing_page2'))], '') AS user_landing_page,
+    ANY_VALUE((SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'initial_landing_page_type')) AS user_landing_page_type,
     SAFE.TIMESTAMP(ANY_VALUE((SELECT value.string_value FROM UNNEST(user_properties) WHERE key = 'first_datetime'))) AS user_first_timestamp,
   FROM `${ProjectID}.${DatasetID}.events_*` 
   WHERE event_name IN ('session_start', 'page_view', 'purchase', 'add_to_cart', 'begin_checkout', 'view_cart', 'view_item', 'view_item_list', 'first_visit', 'select_item', 'add_customer_info', 'add_shipping_info', 'add_billing_info', 'first_purchase')
