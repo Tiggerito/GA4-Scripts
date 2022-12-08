@@ -252,7 +252,6 @@ BEGIN
               traffic_source,
               page_path,
               debug_target,
-              #IF(debug_target2 IS NULL, debug_target, CONCAT(debug_target, debug_target2)) AS debug_target,
               event_timestamp,
               event_date,
               event_name,
@@ -280,7 +279,7 @@ BEGIN
 
                 SAFE.TIMESTAMP_MICROS(ANY_VALUE((SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'call_timestamp'))) AS call_timestamp,
                 ANY_VALUE((SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'call_sequence')) AS call_sequence,
-                SAFE.TIMESTAMP_MICROS(ANY_VALUE((SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'page_timestamp'))) AS page_timestamp,
+                SAFE.TIMESTAMP_MICROS(ANY_VALUE((SELECT CAST(COALESCE(value.double_value, value.int_value) AS INT64) FROM UNNEST(event_params) WHERE key = 'page_timestamp'))) AS page_timestamp,
                 ANY_VALUE(device.category) AS device_category,
                 ANY_VALUE(device.operating_system) AS device_os,
                 ANY_VALUE(traffic_source.medium) AS traffic_medium,
@@ -292,12 +291,6 @@ BEGIN
                     r'^[^?]+')) AS page_path,
                 
                 ARRAY_TO_STRING([ANY_VALUE((SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'debug_target')), ANY_VALUE((SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'debug_target2'))], '') AS debug_target,
-                # ANY_VALUE(
-                #   (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'debug_target'))
-                #   AS debug_target,
-                # ANY_VALUE(
-                #   (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'debug_target2'))
-                #   AS debug_target2,
                 ANY_VALUE(user_pseudo_id) AS user_pseudo_id,
                 ANY_VALUE(geo.country) AS country,
                 ANY_VALUE(event_name) AS event_name,
