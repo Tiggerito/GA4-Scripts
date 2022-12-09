@@ -707,7 +707,7 @@ BEGIN
     WHERE
       table_name = 'user_sessions'
       AND option_name = 'description'
-      AND option_value LIKE "%Version 4.4.1%" # queryVersion
+      AND option_value LIKE "%Version 4.4.2%" # queryVersion
   ) 
   THEN
     CREATE OR REPLACE TABLE `${ProjectID}.tag_rocket.user_sessions` (
@@ -719,7 +719,7 @@ BEGIN
       session_end_timestamp TIMESTAMP,
       user_id STRING,
       session_first_visit INT64,
-      session_first_purchase INT64,
+      #session_first_purchase INT64,
       session_page_view_count INT64,
       session_view_item_list_count INT64,
       session_view_item_count INT64,
@@ -760,7 +760,7 @@ BEGIN
       #user_first_timestamp	TIMESTAMP
     )
     PARTITION BY TIMESTAMP_TRUNC(session_start_timestamp, DAY)
-    OPTIONS (description = 'Version 4.4.1'); # queryVersion
+    OPTIONS (description = 'Version 4.4.2'); # queryVersion
   END IF;
 
   ALTER TABLE `${ProjectID}.tag_rocket.user_sessions`
@@ -786,7 +786,7 @@ BEGIN
       session_end_timestamp,
       user_id,
       session_first_visit,
-      session_first_purchase,
+      #session_first_purchase,
       session_page_view_count,
       session_view_item_list_count,
       session_view_item_count,
@@ -834,7 +834,7 @@ BEGIN
     ANY_VALUE(user_id) AS user_id,
 
     MAX(IF(event_name = 'first_visit',1,0)) AS session_first_visit,
-    MAX(IF(event_name = 'first_purchase',1,0)) AS session_first_purchase,
+    #MAX(IF(event_name = 'first_purchase',1,0)) AS session_first_purchase,
 
     SUM(IF(event_name = 'page_view',1,0)) AS session_page_view_count,
     SUM(IF(event_name = 'view_item_list',1,0)) AS session_view_item_list_count,
@@ -885,7 +885,7 @@ BEGIN
     #ANY_VALUE((SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'initial_landing_page_type')) AS user_landing_page_type,
     #SAFE.TIMESTAMP(ANY_VALUE((SELECT value.string_value FROM UNNEST(user_properties) WHERE key = 'first_datetime'))) AS user_first_timestamp,
   FROM `${ProjectID}.${DatasetID}.events_*` 
-  WHERE event_name IN ('session_start', 'page_view', 'purchase', 'add_to_cart', 'begin_checkout', 'view_cart', 'view_item', 'view_item_list', 'first_visit', 'select_item', 'add_customer_info', 'add_shipping_info', 'add_billing_info', 'first_purchase')
+  WHERE event_name IN ('session_start', 'page_view', 'purchase', 'add_to_cart', 'begin_checkout', 'view_cart', 'view_item', 'view_item_list', 'first_visit', 'select_item', 'add_customer_info', 'add_shipping_info', 'add_billing_info')
   AND (datetogather IS NULL OR _table_suffix BETWEEN FORMAT_DATE('%Y%m%d',datetogather) AND FORMAT_DATE('%Y%m%d',CURRENT_DATE()))
   AND user_pseudo_id IS NOT NULL
   GROUP BY 1, 2; 
@@ -901,7 +901,7 @@ BEGIN
     WHERE
       table_name = 'users'
       AND option_name = 'description'
-      AND option_value LIKE "%Version 4.4.1%" # queryVersion
+      AND option_value LIKE "%Version 4.4.2%" # queryVersion
   ) 
   THEN
     CREATE OR REPLACE TABLE `${ProjectID}.tag_rocket.users` (
@@ -916,10 +916,11 @@ BEGIN
       user_medium	STRING,
       user_source	STRING,
       customer BOOL,
-      last_active TIMESTAMP
+      last_active TIMESTAMP,
+      first_purchase_ga_session_id INT64
     )
     PARTITION BY TIMESTAMP_TRUNC(first_visit_timestamp, DAY)
-    OPTIONS (description = 'Version 4.4.1'); # queryVersion
+    OPTIONS (description = 'Version 4.4.2'); # queryVersion
   END IF;
 
 # keep users forever
@@ -950,7 +951,8 @@ BEGIN
     ANY_VALUE(user_campaign) AS user_campaign,# only set on creation
     ANY_VALUE(user_medium) AS user_medium,# only set on creation
     ANY_VALUE(user_source) AS user_source,# only set on creation
-    SUM(session_purchase_count) AS purchase_count
+    SUM(session_purchase_count) AS purchase_count,
+    MIN(IF(session_purchase_count > 0, ga_session_id, NULL)) AS first_purchase_ga_session_id
   FROM `${ProjectID}.tag_rocket.user_sessions` 
  
   GROUP BY 1
@@ -961,7 +963,8 @@ BEGIN
   WHEN MATCHED THEN UPDATE SET 
     A.last_updated = CURRENT_TIMESTAMP(),
     A.customer = A.customer OR B.purchase_count > 0,
-    A.last_active = B.last_active
+    A.last_active = B.last_active,
+    A.first_purchase_ga_session_id = IFNULL(A.first_purchase_ga_session_id, B.first_purchase_ga_session_id)
   WHEN NOT MATCHED THEN INSERT (
       user_pseudo_id,
       last_updated,
@@ -974,7 +977,8 @@ BEGIN
       user_medium,
       user_source,
       customer,
-      last_active
+      last_active,
+      first_purchase_ga_session_id
   )
   VALUES (
     user_pseudo_id,
@@ -988,7 +992,8 @@ BEGIN
     user_medium,# only set on creation
     user_source,# only set on creation
     purchase_count > 0,
-    last_active
+    last_active,
+    first_purchase_ga_session_id
   );
 
   # Billed Queries Log
