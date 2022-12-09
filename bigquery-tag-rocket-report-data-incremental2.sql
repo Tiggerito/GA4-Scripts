@@ -707,7 +707,7 @@ BEGIN
     WHERE
       table_name = 'user_sessions'
       AND option_name = 'description'
-      AND option_value LIKE "%Version 4.4%" # queryVersion
+      AND option_value LIKE "%Version 4.4.1%" # queryVersion
   ) 
   THEN
     CREATE OR REPLACE TABLE `${ProjectID}.tag_rocket.user_sessions` (
@@ -740,6 +740,7 @@ BEGIN
       session_device_operating_system	STRING,
       session_country	STRING,
       session_landing_page	STRING,
+      session_landing_page_type	STRING,
       session_referrer	STRING,
       session_campaign	STRING,
       session_source	STRING,
@@ -753,13 +754,13 @@ BEGIN
       user_campaign	STRING,
       user_medium	STRING,
       user_source	STRING,
-      user_referrer	STRING,
-      user_landing_page	STRING,
-      user_landing_page_type	STRING,
-      user_first_timestamp	TIMESTAMP
+      #user_referrer	STRING,
+      #user_landing_page	STRING,
+      #user_landing_page_type	STRING,
+      #user_first_timestamp	TIMESTAMP
     )
     PARTITION BY TIMESTAMP_TRUNC(session_start_timestamp, DAY)
-    OPTIONS (description = 'Version 4.4'); # queryVersion
+    OPTIONS (description = 'Version 4.4.1'); # queryVersion
   END IF;
 
   ALTER TABLE `${ProjectID}.tag_rocket.user_sessions`
@@ -806,6 +807,7 @@ BEGIN
       session_device_operating_system,
       session_country,
       session_landing_page,
+      session_landing_page_type,
       session_referrer,
       session_campaign,
       session_source,
@@ -818,11 +820,7 @@ BEGIN
       user_ltv_currency,
       user_campaign,
       user_medium,
-      user_source,
-      user_referrer,
-      user_landing_page,
-      user_landing_page_type,
-      user_first_timestamp
+      user_source
   )
   SELECT 
     
@@ -865,6 +863,7 @@ BEGIN
     # channel grouping (user/session) ????
 
     ANY_VALUE(IF(event_name = 'session_start',(SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'page_location'), NULL)) AS session_landing_page,
+    ARRAY_AGG(IF(event_name = 'page_view',(SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'page_type'), NULL) IGNORE NULLS ORDER BY event_timestamp LIMIT 1 )[OFFSET(0)] AS session_landing_page_type,
     ANY_VALUE(IF(event_name = 'session_start',(SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'page_referrer'), NULL)) AS session_referrer,
 
     ANY_VALUE((SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'campaign')) AS session_campaign,
@@ -881,16 +880,117 @@ BEGIN
     ANY_VALUE(traffic_source.name)	AS user_campaign,
     ANY_VALUE(traffic_source.medium)	AS user_medium,
     ANY_VALUE(traffic_source.source)	AS user_source,
-    ARRAY_TO_STRING([ANY_VALUE((SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'initial_referrer')),ANY_VALUE((SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'initial_referrer2'))], '') AS user_referrer,
-    ARRAY_TO_STRING([ANY_VALUE((SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'initial_landing_page')),ANY_VALUE((SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'initial_landing_page2'))], '') AS user_landing_page,
-    ANY_VALUE((SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'initial_landing_page_type')) AS user_landing_page_type,
-    SAFE.TIMESTAMP(ANY_VALUE((SELECT value.string_value FROM UNNEST(user_properties) WHERE key = 'first_datetime'))) AS user_first_timestamp,
+    #ARRAY_TO_STRING([ANY_VALUE((SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'initial_referrer')),ANY_VALUE((SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'initial_referrer2'))], '') AS user_referrer,
+    #ARRAY_TO_STRING([ANY_VALUE((SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'initial_landing_page')),ANY_VALUE((SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'initial_landing_page2'))], '') AS user_landing_page,
+    #ANY_VALUE((SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'initial_landing_page_type')) AS user_landing_page_type,
+    #SAFE.TIMESTAMP(ANY_VALUE((SELECT value.string_value FROM UNNEST(user_properties) WHERE key = 'first_datetime'))) AS user_first_timestamp,
   FROM `${ProjectID}.${DatasetID}.events_*` 
   WHERE event_name IN ('session_start', 'page_view', 'purchase', 'add_to_cart', 'begin_checkout', 'view_cart', 'view_item', 'view_item_list', 'first_visit', 'select_item', 'add_customer_info', 'add_shipping_info', 'add_billing_info', 'first_purchase')
   AND (datetogather IS NULL OR _table_suffix BETWEEN FORMAT_DATE('%Y%m%d',datetogather) AND FORMAT_DATE('%Y%m%d',CURRENT_DATE()))
   AND user_pseudo_id IS NOT NULL
-  GROUP BY 1, 2;
+  GROUP BY 1, 2; 
+
+  # Users
+
+   # If schema is changed then update both references to the version so the table gets re-built
+  IF NOT EXISTS(
+    SELECT
+      1
+    FROM
+      `${ProjectID}.tag_rocket.INFORMATION_SCHEMA.TABLE_OPTIONS`
+    WHERE
+      table_name = 'users'
+      AND option_name = 'description'
+      AND option_value LIKE "%Version 4.4.1%" # queryVersion
+  ) 
+  THEN
+    CREATE OR REPLACE TABLE `${ProjectID}.tag_rocket.users` (
+      user_pseudo_id STRING,
+      last_updated TIMESTAMP,
+      first_visit_timestamp TIMESTAMP,
+      first_visit_day STRING,
+      first_landing_page STRING,
+      first_landing_page_type	STRING,
+      first_referrer	STRING,
+      user_campaign	STRING,
+      user_medium	STRING,
+      user_source	STRING,
+      customer BOOL,
+      last_active TIMESTAMP
+    )
+    PARTITION BY TIMESTAMP_TRUNC(first_visit_timestamp, DAY)
+    OPTIONS (description = 'Version 4.4.1'); # queryVersion
+  END IF;
+
+# keep users forever
+  #ALTER TABLE `${ProjectID}.tag_rocket.users`
+  #SET OPTIONS (partition_expiration_days = 65); # ExpirationDays
+
+  SET datetogather = (SELECT TIMESTAMP_TRUNC(TIMESTAMP_ADD(MAX(PARSE_TIMESTAMP("%Y%m%d",first_visit_day)), INTERVAL -lookbackDays DAY), DAY) FROM `${ProjectID}.tag_rocket.users`);
+
+  IF datetogather IS NOT NULL THEN
+    DELETE FROM `${ProjectID}.tag_rocket.users` WHERE PARSE_TIMESTAMP("%Y%m%d",first_visit_day) >= datetogather;
+  #ELSE
+  #  IF maxDaysToLookBackOnInitialQuery IS NOT NULL THEN
+  #    SET datetogather = TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL maxDaysToLookBackOnInitialQuery DAY);
+  #  END IF;
+  END IF;
+
+  MERGE INTO `${ProjectID}.tag_rocket.users` A 
+  USING (
+    SELECT    
+    user_pseudo_id,
+    CURRENT_TIMESTAMP(),
+    MIN(session_start_timestamp) AS first_visit_timestamp, # only set on creation
+    MAX(session_end_timestamp) AS last_active, 
+    FORMAT_TIMESTAMP("%Y%m%d",MIN(session_start_timestamp)) AS first_visit_day,  
+    ARRAY_AGG(session_landing_page IGNORE NULLS ORDER BY session_start_timestamp LIMIT 1 )[OFFSET(0)] AS first_landing_page, # only set on creation
+    ARRAY_AGG(session_landing_page_type IGNORE NULLS ORDER BY session_start_timestamp LIMIT 1 )[OFFSET(0)] AS first_landing_page_type, # only set on creation
+    ARRAY_AGG(session_referrer IGNORE NULLS ORDER BY session_start_timestamp LIMIT 1 )[OFFSET(0)] AS first_referrer, # only set on creation
+    ANY_VALUE(user_campaign) AS user_campaign,# only set on creation
+    ANY_VALUE(user_medium) AS user_medium,# only set on creation
+    ANY_VALUE(user_source) AS user_source,# only set on creation
+    SUM(session_purchase_count) AS purchase_count
+  FROM `${ProjectID}.tag_rocket.user_sessions` 
  
+  GROUP BY 1
+   HAVING (datetogather IS NULL OR first_visit_day BETWEEN FORMAT_DATE('%Y%m%d',datetogather) AND FORMAT_DATE('%Y%m%d',CURRENT_DATE()))
+
+  ) B
+  ON A.user_pseudo_id = B.user_pseudo_id
+  WHEN MATCHED THEN UPDATE SET 
+    A.last_updated = CURRENT_TIMESTAMP(),
+    A.customer = A.customer OR B.purchase_count > 0,
+    A.last_active = B.last_active
+  WHEN NOT MATCHED THEN INSERT (
+      user_pseudo_id,
+      last_updated,
+      first_visit_timestamp,
+      first_visit_day,
+      first_landing_page,
+      first_landing_page_type,
+      first_referrer,
+      user_campaign,
+      user_medium,
+      user_source,
+      customer,
+      last_active
+  )
+  VALUES (
+    user_pseudo_id,
+    CURRENT_TIMESTAMP(),
+    first_visit_timestamp, # only set on creation
+    first_visit_day,  
+    first_landing_page, # only set on creation
+    first_landing_page_type, # only set on creation
+    first_referrer, # only set on creation
+    user_campaign,# only set on creation
+    user_medium,# only set on creation
+    user_source,# only set on creation
+    purchase_count > 0,
+    last_active
+  );
+
   # Billed Queries Log
 
   IF NOT EXISTS(
