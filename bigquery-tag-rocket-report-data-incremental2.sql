@@ -870,8 +870,8 @@ BEGIN
 
 
     ANY_VALUE((SELECT value.string_value FROM UNNEST(user_properties) WHERE key = 'customer_group_name')) AS customer_group_name,
-    ANY_VALUE(user_ltv.revenue) AS	user_ltv_revenue,
-    ANY_VALUE(user_ltv.currency) AS user_ltv_currency,
+    MAX(user_ltv.revenue) AS	user_ltv_revenue,
+    MAX(user_ltv.currency) AS user_ltv_currency,
 
     ANY_VALUE(traffic_source.name)	AS user_campaign,
     ANY_VALUE(traffic_source.medium)	AS user_medium,
@@ -893,7 +893,7 @@ BEGIN
     WHERE
       table_name = 'users'
       AND option_name = 'description'
-      AND option_value LIKE "%Version 4.4.2%" # queryVersion
+      AND option_value LIKE "%Version 4.4.3%" # queryVersion
   ) 
   THEN
     CREATE OR REPLACE TABLE `${ProjectID}.tag_rocket.users` (
@@ -909,10 +909,12 @@ BEGIN
       user_source	STRING,
       customer BOOL,
       last_active TIMESTAMP,
-      first_purchase_ga_session_id INT64
+      first_purchase_ga_session_id INT64,
+      user_ltv_revenue FLOAT64,
+      user_ltv_currency STRING
     )
     PARTITION BY TIMESTAMP_TRUNC(first_visit_timestamp, DAY)
-    OPTIONS (description = 'Version 4.4.2'); # queryVersion
+    OPTIONS (description = 'Version 4.4.3'); # queryVersion
   END IF;
 
 # keep users forever
@@ -944,7 +946,9 @@ BEGIN
     ANY_VALUE(user_medium) AS user_medium,# only set on creation
     ANY_VALUE(user_source) AS user_source,# only set on creation
     SUM(session_purchase_count) AS purchase_count,
-    MIN(IF(session_purchase_count > 0, ga_session_id, NULL)) AS first_purchase_ga_session_id
+    MIN(IF(session_purchase_count > 0, ga_session_id, NULL)) AS first_purchase_ga_session_id,
+    ARRAY_AGG(user_ltv_revenue IGNORE NULLS ORDER BY session_start_timestamp DESC LIMIT 1 )[OFFSET(0)] AS user_ltv_revenue,
+    ARRAY_AGG(user_ltv_currency IGNORE NULLS ORDER BY session_start_timestamp DESC LIMIT 1 )[OFFSET(0)] AS user_ltv_currency
   FROM `${ProjectID}.tag_rocket.user_sessions` 
  
   GROUP BY 1
@@ -956,6 +960,8 @@ BEGIN
     A.last_updated = CURRENT_TIMESTAMP(),
     A.customer = A.customer OR B.purchase_count > 0,
     A.last_active = B.last_active,
+    A.user_ltv_revenue = B.user_ltv_revenue,
+    A.user_ltv_currency = B.user_ltv_currency,
     A.first_purchase_ga_session_id = IFNULL(A.first_purchase_ga_session_id, B.first_purchase_ga_session_id)
   WHEN NOT MATCHED THEN INSERT (
       user_pseudo_id,
@@ -970,7 +976,9 @@ BEGIN
       user_source,
       customer,
       last_active,
-      first_purchase_ga_session_id
+      first_purchase_ga_session_id,
+      user_ltv_revenue,
+      user_ltv_currency
   )
   VALUES (
     user_pseudo_id,
@@ -985,7 +993,9 @@ BEGIN
     user_source,# only set on creation
     purchase_count > 0,
     last_active,
-    first_purchase_ga_session_id
+    first_purchase_ga_session_id,
+    user_ltv_revenue,
+    user_ltv_currency
   );
 
   # Billed Queries Log
