@@ -754,10 +754,6 @@ BEGIN
       user_campaign	STRING,
       user_medium	STRING,
       user_source	STRING,
-      #user_referrer	STRING,
-      #user_landing_page	STRING,
-      #user_landing_page_type	STRING,
-      #user_first_timestamp	TIMESTAMP
     )
     PARTITION BY TIMESTAMP_TRUNC(session_start_timestamp, DAY)
     OPTIONS (description = 'Version 4.4.2'); # queryVersion
@@ -879,11 +875,7 @@ BEGIN
 
     ANY_VALUE(traffic_source.name)	AS user_campaign,
     ANY_VALUE(traffic_source.medium)	AS user_medium,
-    ANY_VALUE(traffic_source.source)	AS user_source,
-    #ARRAY_TO_STRING([ANY_VALUE((SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'initial_referrer')),ANY_VALUE((SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'initial_referrer2'))], '') AS user_referrer,
-    #ARRAY_TO_STRING([ANY_VALUE((SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'initial_landing_page')),ANY_VALUE((SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'initial_landing_page2'))], '') AS user_landing_page,
-    #ANY_VALUE((SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'initial_landing_page_type')) AS user_landing_page_type,
-    #SAFE.TIMESTAMP(ANY_VALUE((SELECT value.string_value FROM UNNEST(user_properties) WHERE key = 'first_datetime'))) AS user_first_timestamp,
+    ANY_VALUE(traffic_source.source)	AS user_source
   FROM `${ProjectID}.${DatasetID}.events_*` 
   WHERE event_name IN ('session_start', 'page_view', 'purchase', 'add_to_cart', 'begin_checkout', 'view_cart', 'view_item', 'view_item_list', 'first_visit', 'select_item', 'add_customer_info', 'add_shipping_info', 'add_billing_info')
   AND (datetogather IS NULL OR _table_suffix BETWEEN FORMAT_DATE('%Y%m%d',datetogather) AND FORMAT_DATE('%Y%m%d',CURRENT_DATE()))
