@@ -764,7 +764,7 @@ BEGIN
   END IF;
 
   ALTER TABLE `${ProjectID}.tag_rocket.user_sessions`
-  SET OPTIONS (partition_expiration_days = 65); # ExpirationDays
+  SET OPTIONS (partition_expiration_days = NULL); # ExpirationDays
 
   SET datetogather = (SELECT TIMESTAMP_TRUNC(TIMESTAMP_ADD(MAX(PARSE_TIMESTAMP("%Y%m%d",session_date)), INTERVAL -lookbackDays DAY), DAY) FROM `${ProjectID}.tag_rocket.user_sessions`);
 
@@ -923,8 +923,8 @@ BEGIN
   END IF;
 
 # keep users forever
-  #ALTER TABLE `${ProjectID}.tag_rocket.users`
-  #SET OPTIONS (partition_expiration_days = 65); # ExpirationDays
+  ALTER TABLE `${ProjectID}.tag_rocket.users`
+  SET OPTIONS (partition_expiration_days = NULL); # ExpirationDays
 
   SET datetogather = (SELECT TIMESTAMP_TRUNC(TIMESTAMP_ADD(MAX(PARSE_TIMESTAMP("%Y%m%d",first_visit_day)), INTERVAL -lookbackDays DAY), DAY) FROM `${ProjectID}.tag_rocket.users`);
 
