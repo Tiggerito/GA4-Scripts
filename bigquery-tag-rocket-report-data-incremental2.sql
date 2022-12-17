@@ -880,8 +880,8 @@ BEGIN
   WHERE event_name IN ('session_start', 'page_view', 'purchase', 'add_to_cart', 'begin_checkout', 'view_cart', 'view_item', 'view_item_list', 'first_visit', 'select_item', 'add_customer_info', 'add_shipping_info', 'add_billing_info')
   AND (datetogather IS NULL OR _table_suffix BETWEEN FORMAT_DATE('%Y%m%d',datetogather) AND FORMAT_DATE('%Y%m%d',CURRENT_DATE()))
   AND user_pseudo_id IS NOT NULL
-  AND SUM(IF(event_name = 'page_view',1,0)) > 0
-  GROUP BY 1, 2; 
+  GROUP BY 1, 2
+  HAVING session_page_view_count > 0; 
 
   # Users
 
