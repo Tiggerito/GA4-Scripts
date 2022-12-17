@@ -859,7 +859,7 @@ BEGIN
     # channel grouping (user/session) ????
 
     ANY_VALUE(IF(event_name = 'session_start',(SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'page_location'), NULL)) AS session_landing_page,
-    ARRAY_AGG(IF(event_name = 'page_view',(SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'page_type'), NULL) IGNORE NULLS ORDER BY event_timestamp LIMIT 1 )[OFFSET(0)] AS session_landing_page_type,
+    ARRAY_AGG(IF(event_name = 'page_view',(SELECT COALESCE(value.string_value, CAST(value.int_value AS STRING)) FROM UNNEST(event_params) WHERE key = 'page_type'), NULL) IGNORE NULLS ORDER BY event_timestamp LIMIT 1 )[OFFSET(0)] AS session_landing_page_type,
     ANY_VALUE(IF(event_name = 'session_start',(SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'page_referrer'), NULL)) AS session_referrer,
 
     ANY_VALUE((SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'campaign')) AS session_campaign,
@@ -880,6 +880,7 @@ BEGIN
   WHERE event_name IN ('session_start', 'page_view', 'purchase', 'add_to_cart', 'begin_checkout', 'view_cart', 'view_item', 'view_item_list', 'first_visit', 'select_item', 'add_customer_info', 'add_shipping_info', 'add_billing_info')
   AND (datetogather IS NULL OR _table_suffix BETWEEN FORMAT_DATE('%Y%m%d',datetogather) AND FORMAT_DATE('%Y%m%d',CURRENT_DATE()))
   AND user_pseudo_id IS NOT NULL
+  AND SUM(IF(event_name = 'page_view',1,0)) > 0
   GROUP BY 1, 2; 
 
   # Users
