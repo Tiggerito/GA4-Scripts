@@ -25,8 +25,8 @@ BEGIN
 
   DECLARE maxDaysToLookBackOnInitialQuery DEFAULT 65; # extra days from today to cover the delay in GA4 exporting data. No use in having it larger than ExpirationDays
 
-  DECLARE datetogather DEFAULT CURRENT_TIMESTAMP(); # dummy value. gets updated before every use
-  DECLARE dateToGather2 DEFAULT CURRENT_DATE(); # dummy value. gets updated before every use
+  DECLARE timestampToGather DEFAULT CURRENT_TIMESTAMP(); # dummy value. gets updated before every use
+  DECLARE dateToGather DEFAULT CURRENT_DATE(); # dummy value. gets updated before every use
 
   CREATE SCHEMA IF NOT EXISTS `${ProjectID}.tag_rocket`
   OPTIONS (
@@ -65,7 +65,7 @@ BEGIN
       query_version	STRING,			
       last_run_timestamp	TIMESTAMP
     )
-  OPTIONS (description = 'Version 4.3') # queryVersion
+  OPTIONS (description = 'Version 5.0') # queryVersion
   AS  
   SELECT * FROM (SELECT AS VALUE STRUCT(
     '', # schedule_frequency: how frequently the query is scheduled to run. e.g. "monthly", "every Monday", "manually"
@@ -86,7 +86,7 @@ BEGIN
     '', # bigquery_project_id
     '', # ga4_account_id
     '', # ga4_property_id
-    '4.3', # query_version queryVersion
+    '5.0', # query_version queryVersion
     CURRENT_TIMESTAMP() # last_run_timestamp
   ));
 
@@ -118,10 +118,11 @@ BEGIN
     WHERE
       table_name = 'web_vitals'
       AND option_name = 'description'
-      AND option_value LIKE "%Version 4.3%" # queryVersion
+      AND option_value LIKE "%Version 5.0%" # queryVersion
   ) 
   THEN
-    CREATE OR REPLACE TABLE `${ProjectID}.tag_rocket.web_vitals` (
+    DROP TABLE IF EXISTS `${ProjectID}.tag_rocket.web_vitals`;
+    CREATE TABLE `${ProjectID}.tag_rocket.web_vitals` (
       last_updated TIMESTAMP,
       user_pseudo_id	STRING,
       call_timestamp TIMESTAMP,
@@ -153,25 +154,25 @@ BEGIN
       width	INT64,			
       height	INT64,			
       metric_name	STRING,			
-      event_date	STRING,			
+      event_date	DATE,			
       metric_status	STRING
     )
-    PARTITION BY DATE(event_timestamp)
+    PARTITION BY event_date
     CLUSTER BY metric_name
-    OPTIONS (description = 'Version 4.3');  # queryVersion
+    OPTIONS (description = 'Version 5.0');  # queryVersion
   END IF;
 
   ALTER TABLE `${ProjectID}.tag_rocket.web_vitals`
   SET OPTIONS (partition_expiration_days = 65); # ExpirationDays
 
   # 10MB min per query makes this look expensive for small tables.
-  SET datetogather = (SELECT TIMESTAMP_TRUNC(TIMESTAMP_ADD(MAX(PARSE_TIMESTAMP("%Y%m%d",event_date)), INTERVAL -lookbackDays DAY), DAY) FROM `${ProjectID}.tag_rocket.web_vitals`);
+  SET dateToGather = (SELECT DATE_SUB(MAX(event_date), INTERVAL lookbackDays DAY) FROM `${ProjectID}.tag_rocket.web_vitals`);
 
-  IF datetogather IS NOT NULL THEN
-    DELETE FROM `${ProjectID}.tag_rocket.web_vitals` WHERE PARSE_TIMESTAMP("%Y%m%d",event_date) >= datetogather;
+  IF dateToGather IS NOT NULL THEN
+    DELETE FROM `${ProjectID}.tag_rocket.web_vitals` WHERE event_date >= dateToGather;
   ELSE
     IF maxDaysToLookBackOnInitialQuery IS NOT NULL THEN
-      SET datetogather = TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL maxDaysToLookBackOnInitialQuery DAY);
+      SET dateToGather = DATE_SUB(CURRENT_DATE(), INTERVAL maxDaysToLookBackOnInitialQuery DAY);
     END IF;
   END IF;
 
@@ -305,7 +306,7 @@ BEGIN
                     WHERE key = 'session_engaged'
                   )) AS session_engaged,
                 SAFE.TIMESTAMP_MICROS(MAX(event_timestamp)) AS event_timestamp,
-                MAX(event_date) AS event_date,
+                MAX(PARSE_DATE('%Y%m%d', event_date)) AS event_date,
                 MAX(
                   (
                     SELECT COALESCE(value.double_value, value.int_value)
@@ -328,8 +329,7 @@ BEGIN
                 `${ProjectID}.${DatasetID}.events_*`
               WHERE
                 event_name IN ('LCP', 'FID', 'CLS', 'TTFB', 'FCP', 'INP', 'first_visit', 'purchase')
-                # Gather one more day than datetogather so we get cross midnight joins working
-                AND (datetogather IS NULL OR _table_suffix BETWEEN FORMAT_DATE('%Y%m%d',DATE_SUB(datetogather, INTERVAL 1 DAY)) AND FORMAT_DATE('%Y%m%d',CURRENT_DATE()))                  
+                AND (dateToGather IS NULL OR _table_suffix BETWEEN FORMAT_DATE('%Y%m%d',DATE_SUB(dateToGather, INTERVAL 1 DAY)) AND FORMAT_DATE('%Y%m%d',CURRENT_DATE()))                  
               GROUP BY
                 1, 2
             )
@@ -340,7 +340,7 @@ BEGIN
     )
   CROSS JOIN UNNEST(events) AS evt
   WHERE evt.event_name NOT IN ('first_visit', 'purchase')
-  AND (datetogather IS NULL OR PARSE_TIMESTAMP("%Y%m%d",event_date) >= datetogather);
+  AND (dateToGather IS NULL OR event_date >= dateToGather);
  
 
   # Purchases 
@@ -356,14 +356,14 @@ BEGIN
       AND option_value LIKE "%Version 5.0%" # queryVersion
   ) 
   THEN
-    DROP TABLE IF EXISTS `${ProjectID}.tag_rocket.purchases`;
-    CREATE TABLE `${ProjectID}.tag_rocket.purchases` (
+    DROP TABLE IF EXISTS `${ProjectID}.tag_rocket.purchases`;  
+    CREATE TABLE `${ProjectID}.tag_rocket.purchases` (  
       last_updated TIMESTAMP,
       user_pseudo_id	STRING,
       user_id	STRING,
       transaction_id	STRING,			
       event_timestamp	TIMESTAMP,			
-      event_date DATE,			
+      event_date DATE,			## NEW WAY: DATE 
       purchase_event_timestamp	TIMESTAMP,			
       purchase_revenue	FLOAT64,		
       purchase_shipping_value FLOAT64,		
@@ -386,20 +386,19 @@ BEGIN
       user_ltv_currency	STRING
     )
     PARTITION BY event_date
-    OPTIONS (description = 'Version 5.0');  # queryVersion
+    OPTIONS (description = 'Version 5.0');  # queryVersion  
   END IF;
 
   ALTER TABLE `${ProjectID}.tag_rocket.purchases`
   SET OPTIONS (partition_expiration_days = 65); # ExpirationDays
 
-  # 10MB min per query makes this look expensive for small tables.
-  SET dateToGather2 = (SELECT DATE_SUB(MAX(event_date), INTERVAL lookbackDays DAY) FROM `${ProjectID}.tag_rocket.purchases`);
+  SET dateToGather = (SELECT DATE_SUB(MAX(event_date), INTERVAL lookbackDays DAY) FROM `${ProjectID}.tag_rocket.purchases`); 
 
-  IF dateToGather2 IS NOT NULL THEN
-    DELETE FROM `${ProjectID}.tag_rocket.purchases` WHERE event_date >= dateToGather2;
+  IF dateToGather IS NOT NULL THEN
+    DELETE FROM `${ProjectID}.tag_rocket.purchases` WHERE event_date >= dateToGather;
   ELSE
     IF maxDaysToLookBackOnInitialQuery IS NOT NULL THEN
-      SET dateToGather2 = DATE_SUB(CURRENT_DATE(), INTERVAL maxDaysToLookBackOnInitialQuery DAY);
+      SET dateToGather = DATE_SUB(CURRENT_DATE(), INTERVAL maxDaysToLookBackOnInitialQuery DAY);
     END IF;
   END IF;
 
@@ -438,7 +437,7 @@ BEGIN
     user_id,
     IFNULL(purchase_transaction_id, server_purchase_transaction_id) AS transaction_id,
     IFNULL(purchase_event_timestamp, server_purchase_event_timestamp) AS event_timestamp,
-    IFNULL(purchase_event_date, server_purchase_event_date) AS event_date,
+    IFNULL(purchase_event_date, server_purchase_event_date) AS event_date, ## NEW WAY: DATE
     purchase_event_timestamp,
     purchase_revenue,
     purchase_shipping_value,
@@ -483,7 +482,7 @@ BEGIN
       ANY_VALUE(user_ltv.currency) AS user_ltv_currency
     FROM `${ProjectID}.${DatasetID}.events_*` 
     WHERE event_name = 'purchase'
-    AND (dateToGather2 IS NULL OR _table_suffix BETWEEN FORMAT_DATE('%Y%m%d',DATE_SUB(dateToGather2, INTERVAL 1 DAY)) AND FORMAT_DATE('%Y%m%d',CURRENT_DATE())) # one more day than dateToGather2 so we get cross midnight joins working. 
+    AND (dateToGather IS NULL OR _table_suffix BETWEEN FORMAT_DATE('%Y%m%d',DATE_SUB(dateToGather, INTERVAL 1 DAY)) AND FORMAT_DATE('%Y%m%d',CURRENT_DATE())) # one more day than dateToGather so we get cross midnight joins working. 
     GROUP BY purchase_transaction_id
     )
   FULL OUTER JOIN 
@@ -493,14 +492,14 @@ BEGIN
       ANY_VALUE((SELECT COALESCE(value.double_value, value.int_value) FROM UNNEST(event_params) WHERE key = 'value')) AS server_purchase_revenue,
       ANY_VALUE((SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'method')) AS server_purchase_method,
       COUNT(*) AS server_purchase_events,
-      MAX(PARSE_DATE('%Y%m%d', event_date)) AS server_purchase_event_date,
+      MAX(PARSE_DATE('%Y%m%d', event_date)) AS server_purchase_event_date, ## NEW WAY: DATE
     FROM `${ProjectID}.${DatasetID}.events_*` 
     WHERE event_name = 'server_purchase'
-    AND (dateToGather2 IS NULL OR _table_suffix BETWEEN FORMAT_DATE('%Y%m%d',DATE_SUB(dateToGather2, INTERVAL 1 DAY)) AND FORMAT_DATE('%Y%m%d',CURRENT_DATE())) # one more day than dateToGather2 so we get cross midnight joins working. 
+    AND (dateToGather IS NULL OR _table_suffix BETWEEN FORMAT_DATE('%Y%m%d',DATE_SUB(dateToGather, INTERVAL 1 DAY)) AND FORMAT_DATE('%Y%m%d',CURRENT_DATE())) # one more day than dateToGather so we get cross midnight joins working. 
     GROUP BY server_purchase_transaction_id
     )
   ON purchase_transaction_id = server_purchase_transaction_id
-  WHERE (dateToGather2 IS NULL OR IFNULL(purchase_event_date, server_purchase_event_date) >= dateToGather2);
+  WHERE (dateToGather IS NULL OR IFNULL(purchase_event_date, server_purchase_event_date) >= dateToGather); 
 
   # Website Errors 
 
@@ -513,16 +512,17 @@ BEGIN
     WHERE
       table_name = 'website_errors'
       AND option_name = 'description'
-      AND option_value LIKE "%Version 4.3%" # queryVersion
+      AND option_value LIKE "%Version 5.0%" # queryVersion
   ) 
   THEN
-    CREATE OR REPLACE TABLE `${ProjectID}.tag_rocket.website_errors` (
+    DROP TABLE IF EXISTS `${ProjectID}.tag_rocket.website_errors`;
+    CREATE TABLE `${ProjectID}.tag_rocket.website_errors` (
       last_updated TIMESTAMP,
       user_pseudo_id	STRING,
       call_timestamp TIMESTAMP,
       call_sequence INT64,
       event_timestamp TIMESTAMP,
-      event_date	STRING,
+      event_date	DATE,
       device_browser	STRING,
       device_browser_version	STRING,
       device_category	STRING,
@@ -540,23 +540,21 @@ BEGIN
       error_colno	STRING,
       error_object_type	STRING	
     )
-    # or maybe month? each partition should be 1GB https://medium.com/dataseries/costs-and-performance-lessons-after-using-bigquery-with-terabytes-of-data-54a5809ac912
-    PARTITION BY TIMESTAMP_TRUNC(event_timestamp, DAY)
-    OPTIONS (description = 'Version 4.3');  # queryVersion
+    PARTITION BY event_date
+    OPTIONS (description = 'Version 5.0');  # queryVersion
   END IF;
 
   ALTER TABLE `${ProjectID}.tag_rocket.website_errors`
   SET OPTIONS (partition_expiration_days = 65); # ExpirationDays
 
-  # 10MB min per query makes this look expensive for small tables.
-  SET datetogather = (SELECT TIMESTAMP_TRUNC(TIMESTAMP_ADD(MAX(PARSE_TIMESTAMP("%Y%m%d",event_date)), INTERVAL -lookbackDays DAY), DAY) FROM `${ProjectID}.tag_rocket.website_errors`);
+  SET dateToGather = (SELECT DATE_SUB(MAX(event_date), INTERVAL lookbackDays DAY) FROM `${ProjectID}.tag_rocket.website_errors`);
 
-  IF datetogather IS NOT NULL THEN
-    DELETE FROM `${ProjectID}.tag_rocket.website_errors` WHERE PARSE_TIMESTAMP("%Y%m%d",event_date) >= datetogather;
+  IF dateToGather IS NOT NULL THEN
+    DELETE FROM `${ProjectID}.tag_rocket.website_errors` WHERE event_date >= dateToGather;
   ELSE
     IF maxDaysToLookBackOnInitialQuery IS NOT NULL THEN
-      SET datetogather = TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL maxDaysToLookBackOnInitialQuery DAY);
-    END IF;
+       SET dateToGather = DATE_SUB(CURRENT_DATE(), INTERVAL maxDaysToLookBackOnInitialQuery DAY);
+   END IF;
   END IF;
 
   INSERT `${ProjectID}.tag_rocket.website_errors` 
@@ -590,7 +588,7 @@ BEGIN
     SAFE.TIMESTAMP_MILLIS((SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'call_timestamp')) AS call_timestamp,
     (SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'call_sequence') AS call_sequence,
     SAFE.TIMESTAMP_MICROS(event_timestamp) AS event_timestamp,
-    event_date,
+    PARSE_DATE('%Y%m%d', event_date),
     device.web_info.browser AS device_browser,
     device.web_info.browser_version AS device_browser_version,
     device.category AS device_category,
@@ -609,8 +607,7 @@ BEGIN
     (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'error_object_type') AS error_object_type
   FROM `${ProjectID}.${DatasetID}.events_*` 
   WHERE event_name = 'exception'
-  #AND (datetogather IS NULL OR TIMESTAMP_TRUNC(TIMESTAMP_MICROS(event_timestamp), DAY) > datetogather)
-  AND (datetogather IS NULL OR _table_suffix BETWEEN FORMAT_DATE('%Y%m%d',datetogather) AND FORMAT_DATE('%Y%m%d',CURRENT_DATE()));
+  AND (dateToGather IS NULL OR _table_suffix BETWEEN FORMAT_DATE('%Y%m%d',dateToGather) AND FORMAT_DATE('%Y%m%d',CURRENT_DATE()));
 
   # Missing Pages
 
@@ -623,16 +620,17 @@ BEGIN
     WHERE
       table_name = 'missing_pages'
       AND option_name = 'description'
-      AND option_value LIKE "%Version 4.3%" # queryVersion
+      AND option_value LIKE "%Version 5.0%" # queryVersion
   ) 
   THEN
-    CREATE OR REPLACE TABLE `${ProjectID}.tag_rocket.missing_pages` (
+    DROP TABLE IF EXISTS `${ProjectID}.tag_rocket.missing_pages`;
+    CREATE TABLE `${ProjectID}.tag_rocket.missing_pages` (
       last_updated TIMESTAMP,
       user_pseudo_id	STRING,
       call_timestamp TIMESTAMP,
       call_sequence INT64,
       event_timestamp TIMESTAMP,
-      event_date	STRING,
+      event_date	DATE,
       source	STRING,
       medium	STRING,
       campaign	STRING,
@@ -640,21 +638,20 @@ BEGIN
       page_type	STRING,
       page_referrer	STRING
     )
-    # or maybe month? each partition should be 1GB https://medium.com/dataseries/costs-and-performance-lessons-after-using-bigquery-with-terabytes-of-data-54a5809ac912
-    PARTITION BY TIMESTAMP_TRUNC(event_timestamp, DAY)
-    OPTIONS (description = 'Version 4.3'); # queryVersion
+    PARTITION BY event_date
+    OPTIONS (description = 'Version 5.0'); # queryVersion
   END IF;
 
   ALTER TABLE `${ProjectID}.tag_rocket.missing_pages`
   SET OPTIONS (partition_expiration_days = 65); # ExpirationDays
 
-  SET datetogather = (SELECT TIMESTAMP_TRUNC(TIMESTAMP_ADD(MAX(PARSE_TIMESTAMP("%Y%m%d",event_date)), INTERVAL -lookbackDays DAY), DAY) FROM `${ProjectID}.tag_rocket.missing_pages`);
+  SET dateToGather = (SELECT DATE_SUB(MAX(event_date), INTERVAL lookbackDays DAY) FROM `${ProjectID}.tag_rocket.missing_pages`);
 
-  IF datetogather IS NOT NULL THEN
-    DELETE FROM `${ProjectID}.tag_rocket.missing_pages` WHERE PARSE_TIMESTAMP("%Y%m%d",event_date) >= datetogather;
+  IF dateToGather IS NOT NULL THEN
+    DELETE FROM `${ProjectID}.tag_rocket.missing_pages` WHERE event_date >= dateToGather;
   ELSE
     IF maxDaysToLookBackOnInitialQuery IS NOT NULL THEN
-      SET datetogather = TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL maxDaysToLookBackOnInitialQuery DAY);
+       SET dateToGather = DATE_SUB(CURRENT_DATE(), INTERVAL maxDaysToLookBackOnInitialQuery DAY);
     END IF;
   END IF;
 
@@ -679,7 +676,7 @@ BEGIN
     SAFE.TIMESTAMP_MILLIS((SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'call_timestamp')) AS call_timestamp,
     (SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'call_sequence') AS call_sequence,
     SAFE.TIMESTAMP_MICROS(event_timestamp) AS event_timestamp,
-    event_date,
+    PARSE_DATE('%Y%m%d', event_date),
     # traffic_source.medium AS traffic_medium, # user level
     # traffic_source.name AS traffic_name, # user level
     # traffic_source.source AS traffic_source, # user level
@@ -691,7 +688,7 @@ BEGIN
     (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'page_referrer') AS page_referrer
   FROM `${ProjectID}.${DatasetID}.events_*` 
   WHERE event_name = 'page_view'
-  AND (datetogather IS NULL OR _table_suffix BETWEEN FORMAT_DATE('%Y%m%d',datetogather) AND FORMAT_DATE('%Y%m%d',CURRENT_DATE()));
+  AND (dateToGather IS NULL OR _table_suffix BETWEEN FORMAT_DATE('%Y%m%d',dateToGather) AND FORMAT_DATE('%Y%m%d',CURRENT_DATE()));
 
   # User Sessions
 
@@ -704,14 +701,15 @@ BEGIN
     WHERE
       table_name = 'user_sessions'
       AND option_name = 'description'
-      AND option_value LIKE "%Version 4.4.2%" # queryVersion
+      AND option_value LIKE "%Version 5.0%" # queryVersion
   ) 
   THEN
-    CREATE OR REPLACE TABLE `${ProjectID}.tag_rocket.user_sessions` (
+    DROP TABLE IF EXISTS `${ProjectID}.tag_rocket.user_sessions`;
+    CREATE TABLE `${ProjectID}.tag_rocket.user_sessions` (
       user_pseudo_id STRING,
       ga_session_id INT64,
       last_updated TIMESTAMP,
-      session_date STRING,
+      session_date DATE,
       session_start_timestamp TIMESTAMP,
       session_end_timestamp TIMESTAMP,
       user_id STRING,
@@ -752,20 +750,20 @@ BEGIN
       user_medium	STRING,
       user_source	STRING,
     )
-    PARTITION BY TIMESTAMP_TRUNC(session_start_timestamp, DAY)
-    OPTIONS (description = 'Version 4.4.2'); # queryVersion
+    PARTITION BY session_date
+    OPTIONS (description = 'Version 5.0'); # queryVersion
   END IF;
 
   ALTER TABLE `${ProjectID}.tag_rocket.user_sessions`
   SET OPTIONS (partition_expiration_days = NULL); # ExpirationDays
 
-  SET datetogather = (SELECT TIMESTAMP_TRUNC(TIMESTAMP_ADD(MAX(PARSE_TIMESTAMP("%Y%m%d",session_date)), INTERVAL -lookbackDays DAY), DAY) FROM `${ProjectID}.tag_rocket.user_sessions`);
+  SET dateToGather = (SELECT DATE_SUB(MAX(session_date), INTERVAL lookbackDays DAY) FROM `${ProjectID}.tag_rocket.user_sessions`);
 
-  IF datetogather IS NOT NULL THEN
-    DELETE FROM `${ProjectID}.tag_rocket.user_sessions` WHERE PARSE_TIMESTAMP("%Y%m%d",session_date) >= datetogather;
+  IF dateToGather IS NOT NULL THEN
+    DELETE FROM `${ProjectID}.tag_rocket.user_sessions` WHERE session_date >= dateToGather;
   ELSE
     IF maxDaysToLookBackOnInitialQuery IS NOT NULL THEN
-      SET datetogather = TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL maxDaysToLookBackOnInitialQuery DAY);
+       SET dateToGather = DATE_SUB(CURRENT_DATE(), INTERVAL maxDaysToLookBackOnInitialQuery DAY);
     END IF;
   END IF;
 
@@ -820,7 +818,7 @@ BEGIN
     user_pseudo_id,
     (SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'ga_session_id') AS ga_session_id, # not unique, but is per user_pseudo_id
     CURRENT_TIMESTAMP(),
-    FORMAT_TIMESTAMP("%Y%m%d",SAFE.TIMESTAMP_MICROS(MIN(event_timestamp))) AS session_date,  
+    MIN(PARSE_DATE('%Y%m%d', event_date)) AS session_date,  
     SAFE.TIMESTAMP_MICROS(MIN(event_timestamp)) AS session_start_timestamp, 
     SAFE.TIMESTAMP_MICROS(MAX(event_timestamp)) AS session_end_timestamp, 
     # session length
@@ -875,7 +873,7 @@ BEGIN
     ANY_VALUE(traffic_source.source)	AS user_source
   FROM `${ProjectID}.${DatasetID}.events_*` 
   WHERE event_name IN ('session_start', 'page_view', 'purchase', 'add_to_cart', 'begin_checkout', 'view_cart', 'view_item', 'view_item_list', 'first_visit', 'select_item', 'add_customer_info', 'add_shipping_info', 'add_billing_info')
-  AND (datetogather IS NULL OR _table_suffix BETWEEN FORMAT_DATE('%Y%m%d',datetogather) AND FORMAT_DATE('%Y%m%d',CURRENT_DATE()))
+  AND (dateToGather IS NULL OR _table_suffix BETWEEN FORMAT_DATE('%Y%m%d',dateToGather) AND FORMAT_DATE('%Y%m%d',CURRENT_DATE()))
   AND user_pseudo_id IS NOT NULL
   GROUP BY 1, 2
   HAVING session_page_view_count > 0; 
@@ -891,14 +889,15 @@ BEGIN
     WHERE
       table_name = 'users'
       AND option_name = 'description'
-      AND option_value LIKE "%Version 4.4.3%" # queryVersion
+      AND option_value LIKE "%Version 5.0%" # queryVersion
   ) 
   THEN
-    CREATE OR REPLACE TABLE `${ProjectID}.tag_rocket.users` (
+    DROP TABLE IF EXISTS `${ProjectID}.tag_rocket.users`;
+    CREATE TABLE `${ProjectID}.tag_rocket.users` (
       user_pseudo_id STRING,
       last_updated TIMESTAMP,
       first_visit_timestamp TIMESTAMP,
-      first_visit_day STRING,
+      first_visit_day DATE,
       first_landing_page STRING,
       first_landing_page_type	STRING,
       first_referrer	STRING,
@@ -911,21 +910,21 @@ BEGIN
       user_ltv_revenue FLOAT64,
       user_ltv_currency STRING
     )
-    PARTITION BY TIMESTAMP_TRUNC(first_visit_timestamp, DAY)
-    OPTIONS (description = 'Version 4.4.3'); # queryVersion
+    PARTITION BY first_visit_day
+    OPTIONS (description = 'Version 5.0'); # queryVersion
   END IF;
 
 # keep users forever
   ALTER TABLE `${ProjectID}.tag_rocket.users`
   SET OPTIONS (partition_expiration_days = NULL); # ExpirationDays
 
-  SET datetogather = (SELECT TIMESTAMP_TRUNC(TIMESTAMP_ADD(MAX(PARSE_TIMESTAMP("%Y%m%d",first_visit_day)), INTERVAL -lookbackDays DAY), DAY) FROM `${ProjectID}.tag_rocket.users`);
+  SET dateToGather = (SELECT DATE_SUB(MAX(first_visit_day), INTERVAL lookbackDays DAY) FROM `${ProjectID}.tag_rocket.users`);
 
-  IF datetogather IS NOT NULL THEN
-    DELETE FROM `${ProjectID}.tag_rocket.users` WHERE PARSE_TIMESTAMP("%Y%m%d",first_visit_day) >= datetogather;
+  IF dateToGather IS NOT NULL THEN
+    DELETE FROM `${ProjectID}.tag_rocket.users` WHERE first_visit_day >= dateToGather;
   #ELSE
   #  IF maxDaysToLookBackOnInitialQuery IS NOT NULL THEN
-  #    SET datetogather = TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL maxDaysToLookBackOnInitialQuery DAY);
+  #    SET dateToGather = DATE_SUB(CURRENT_DATE(), INTERVAL maxDaysToLookBackOnInitialQuery DAY);
   #  END IF;
   END IF;
 
@@ -936,7 +935,7 @@ BEGIN
     CURRENT_TIMESTAMP(),
     MIN(session_start_timestamp) AS first_visit_timestamp, # only set on creation
     MAX(session_end_timestamp) AS last_active, 
-    FORMAT_TIMESTAMP("%Y%m%d",MIN(session_start_timestamp)) AS first_visit_day,  
+    MIN(session_date) AS first_visit_day,  
     ARRAY_AGG(session_landing_page IGNORE NULLS ORDER BY session_start_timestamp LIMIT 1 )[OFFSET(0)] AS first_landing_page, # only set on creation
     ARRAY_AGG(session_landing_page_type IGNORE NULLS ORDER BY session_start_timestamp LIMIT 1 )[OFFSET(0)] AS first_landing_page_type, # only set on creation
     ARRAY_AGG(session_referrer IGNORE NULLS ORDER BY session_start_timestamp LIMIT 1 )[OFFSET(0)] AS first_referrer, # only set on creation
@@ -950,7 +949,7 @@ BEGIN
   FROM `${ProjectID}.tag_rocket.user_sessions` 
  
   GROUP BY 1
-   HAVING (datetogather IS NULL OR first_visit_day BETWEEN FORMAT_DATE('%Y%m%d',datetogather) AND FORMAT_DATE('%Y%m%d',CURRENT_DATE()))
+   HAVING dateToGather IS NULL OR first_visit_day >= dateToGather
 
   ) B
   ON A.user_pseudo_id = B.user_pseudo_id
@@ -1006,10 +1005,11 @@ BEGIN
     WHERE
       table_name = 'query_logs'
       AND option_name = 'description'
-      AND option_value LIKE "%Version 4.3%" # queryVersion
+      AND option_value LIKE "%Version 5.0%" # queryVersion
   ) 
   THEN
-    CREATE OR REPLACE TABLE `${ProjectID}.tag_rocket.query_logs` (
+    DROP TABLE IF EXISTS `${ProjectID}.tag_rocket.query_logs`;
+    CREATE TABLE `${ProjectID}.tag_rocket.query_logs` (
       day_timestamp TIMESTAMP,
       principal_email	STRING,
       billed_bytes INT64,
@@ -1022,19 +1022,19 @@ BEGIN
       month_to_date_bytes INT64
     )
     PARTITION BY DATE(day_timestamp)
-    OPTIONS (description = 'Version 4.3'); # queryVersion
+    OPTIONS (description = 'Version 5.0'); # queryVersion
 
     INSERT `${ProjectID}.tag_rocket.query_logs` (day_timestamp, principal_email, billed_bytes, billed_query_count, error_count, budget_trendline_bytes, rolling_total_bytes, month_to_date_bytes)
   VALUES(current_timestamp(),'',0,0,0,0,0,0);
   END IF;
 
-  SET datetogather = (SELECT TIMESTAMP_TRUNC(TIMESTAMP_ADD(MAX(day_timestamp), INTERVAL -1 DAY), DAY) FROM `${ProjectID}.tag_rocket.query_logs`);
+  SET timestampToGather = (SELECT TIMESTAMP_TRUNC(TIMESTAMP_ADD(MAX(day_timestamp), INTERVAL -1 DAY), DAY) FROM `${ProjectID}.tag_rocket.query_logs`);
 
-  IF datetogather IS NOT NULL THEN
-    DELETE FROM `${ProjectID}.tag_rocket.query_logs` WHERE day_timestamp >= datetogather;
+  IF timestampToGather IS NOT NULL THEN
+    DELETE FROM `${ProjectID}.tag_rocket.query_logs` WHERE day_timestamp >= timestampToGather;
   ELSE
     IF maxDaysToLookBackOnInitialQuery IS NOT NULL THEN
-      SET datetogather = TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL maxDaysToLookBackOnInitialQuery DAY);
+      SET timestampToGather = TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL maxDaysToLookBackOnInitialQuery DAY);
     END IF;
   END IF;
 
@@ -1065,7 +1065,7 @@ BEGIN
       CAST((EXTRACT(DAY FROM CURRENT_DATE()) * 1000 * 1000 * 1000 * 1000) / EXTRACT(DAY FROM LAST_DAY(CURRENT_DATE())) AS INT64) AS budget_trendline_bytes
     FROM
       `${ProjectID}.bq_logs.cloudaudit_googleapis_com_data_access_*`
-    WHERE datetogather IS NULL OR TIMESTAMP_TRUNC(timestamp, DAY) >= datetogather
+    WHERE timestampToGather IS NULL OR TIMESTAMP_TRUNC(timestamp, DAY) >= timestampToGather
     GROUP BY 1, 2
     ORDER BY day_timestamp DESC, principal_email;
   END IF;
