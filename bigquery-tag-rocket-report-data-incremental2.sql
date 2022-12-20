@@ -1,4 +1,4 @@
-# Tag Rocket Report Data Incremental 2 v4.4
+# Tag Rocket Report Data Incremental 2 v5.0
 # https://github.com/Tiggerito/GA4-Scripts/blob/main/bigquery-tag-rocket-report-data-incremental2.sql
 
 # Replace all occurances of ${DatasetID} with your Dataset ID for the GA4 export. Something like analytics_1234567890
@@ -26,6 +26,7 @@ BEGIN
   DECLARE maxDaysToLookBackOnInitialQuery DEFAULT 65; # extra days from today to cover the delay in GA4 exporting data. No use in having it larger than ExpirationDays
 
   DECLARE datetogather DEFAULT CURRENT_TIMESTAMP(); # dummy value. gets updated before every use
+  DECLARE dateToGather2 DEFAULT CURRENT_DATE(); # dummy value. gets updated before every use
 
   CREATE SCHEMA IF NOT EXISTS `${ProjectID}.tag_rocket`
   OPTIONS (
@@ -277,9 +278,9 @@ BEGIN
                 (SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'ga_session_id') AS ga_session_id, # can be null in consent mode making grouping bad ?
                 (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'metric_id') AS metric_id,
 
-                SAFE.TIMESTAMP_MICROS(ANY_VALUE((SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'call_timestamp'))) AS call_timestamp,
+                SAFE.TIMESTAMP_MILLIS(ANY_VALUE((SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'call_timestamp'))) AS call_timestamp,
                 ANY_VALUE((SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'call_sequence')) AS call_sequence,
-                SAFE.TIMESTAMP_MICROS(ANY_VALUE((SELECT CAST(COALESCE(value.double_value, value.int_value) AS INT64) FROM UNNEST(event_params) WHERE key = 'page_timestamp'))) AS page_timestamp,
+                SAFE.TIMESTAMP_MILLIS(ANY_VALUE((SELECT CAST(COALESCE(value.double_value, value.int_value) AS INT64) FROM UNNEST(event_params) WHERE key = 'page_timestamp'))) AS page_timestamp,
                 ANY_VALUE(device.category) AS device_category,
                 ANY_VALUE(device.operating_system) AS device_os,
                 ANY_VALUE(traffic_source.medium) AS traffic_medium,
@@ -352,17 +353,17 @@ BEGIN
     WHERE
       table_name = 'purchases'
       AND option_name = 'description'
-      AND option_value LIKE "%Version 4.3%" # queryVersion
+      AND option_value LIKE "%Version 5.0%" # queryVersion
   ) 
   THEN
-    CREATE OR REPLACE TABLE `${ProjectID}.tag_rocket.purchases` (
+    DROP TABLE IF EXISTS `${ProjectID}.tag_rocket.purchases`;
+    CREATE TABLE `${ProjectID}.tag_rocket.purchases` (
       last_updated TIMESTAMP,
       user_pseudo_id	STRING,
-      call_timestamp TIMESTAMP,
-      call_sequence INT64,
+      user_id	STRING,
       transaction_id	STRING,			
       event_timestamp	TIMESTAMP,			
-      event_date	STRING,			
+      event_date DATE,			
       purchase_event_timestamp	TIMESTAMP,			
       purchase_revenue	FLOAT64,		
       purchase_shipping_value FLOAT64,		
@@ -384,22 +385,21 @@ BEGIN
       user_ltv_revenue	FLOAT64,			
       user_ltv_currency	STRING
     )
-    # or maybe month? each partition should be 1GB https://medium.com/dataseries/costs-and-performance-lessons-after-using-bigquery-with-terabytes-of-data-54a5809ac912
-    PARTITION BY TIMESTAMP_TRUNC(event_timestamp, DAY)
-    OPTIONS (description = 'Version 4.3');  # queryVersion
+    PARTITION BY event_date
+    OPTIONS (description = 'Version 5.0');  # queryVersion
   END IF;
 
   ALTER TABLE `${ProjectID}.tag_rocket.purchases`
   SET OPTIONS (partition_expiration_days = 65); # ExpirationDays
 
   # 10MB min per query makes this look expensive for small tables.
-  SET datetogather = (SELECT TIMESTAMP_TRUNC(TIMESTAMP_ADD(MAX(PARSE_TIMESTAMP("%Y%m%d",event_date)), INTERVAL -lookbackDays DAY), DAY) FROM `${ProjectID}.tag_rocket.purchases`);
+  SET dateToGather2 = (SELECT DATE_SUB(MAX(event_date), INTERVAL lookbackDays DAY) FROM `${ProjectID}.tag_rocket.purchases`);
 
-  IF datetogather IS NOT NULL THEN
-    DELETE FROM `${ProjectID}.tag_rocket.purchases` WHERE PARSE_TIMESTAMP("%Y%m%d",event_date) >= datetogather;
+  IF dateToGather2 IS NOT NULL THEN
+    DELETE FROM `${ProjectID}.tag_rocket.purchases` WHERE event_date >= dateToGather2;
   ELSE
     IF maxDaysToLookBackOnInitialQuery IS NOT NULL THEN
-      SET datetogather = TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL maxDaysToLookBackOnInitialQuery DAY);
+      SET dateToGather2 = DATE_SUB(CURRENT_DATE(), INTERVAL maxDaysToLookBackOnInitialQuery DAY);
     END IF;
   END IF;
 
@@ -407,8 +407,7 @@ BEGIN
   (
       last_updated,
       user_pseudo_id,
-      call_timestamp,
-      call_sequence,
+      user_id,
       transaction_id,
       event_timestamp,
       event_date,
@@ -436,8 +435,7 @@ BEGIN
   SELECT 
     CURRENT_TIMESTAMP(),
     user_pseudo_id,
-    call_timestamp,
-    call_sequence,
+    user_id,
     IFNULL(purchase_transaction_id, server_purchase_transaction_id) AS transaction_id,
     IFNULL(purchase_event_timestamp, server_purchase_event_timestamp) AS event_timestamp,
     IFNULL(purchase_event_date, server_purchase_event_date) AS event_date,
@@ -464,10 +462,9 @@ BEGIN
   FROM
     (SELECT 
       ANY_VALUE(user_pseudo_id) AS user_pseudo_id,
-      SAFE.TIMESTAMP_MICROS(ANY_VALUE((SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'call_timestamp'))) AS call_timestamp,
-      ANY_VALUE((SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'call_sequence')) AS call_sequence,
+      ANY_VALUE(user_id) AS user_id,
       SAFE.TIMESTAMP_MICROS(ANY_VALUE(event_timestamp)) AS purchase_event_timestamp,
-      MAX(event_date) AS purchase_event_date,
+      MAX(PARSE_DATE('%Y%m%d', event_date)) AS purchase_event_date,
       ecommerce.transaction_id AS purchase_transaction_id,
       ANY_VALUE(ecommerce.purchase_revenue) AS purchase_revenue,
       ANY_VALUE(ecommerce.shipping_value) AS purchase_shipping_value,
@@ -486,7 +483,7 @@ BEGIN
       ANY_VALUE(user_ltv.currency) AS user_ltv_currency
     FROM `${ProjectID}.${DatasetID}.events_*` 
     WHERE event_name = 'purchase'
-    AND (datetogather IS NULL OR _table_suffix BETWEEN FORMAT_DATE('%Y%m%d',DATE_SUB(datetogather, INTERVAL 1 DAY)) AND FORMAT_DATE('%Y%m%d',CURRENT_DATE())) # one more day than datetogather so we get cross midnight joins working. 
+    AND (dateToGather2 IS NULL OR _table_suffix BETWEEN FORMAT_DATE('%Y%m%d',DATE_SUB(dateToGather2, INTERVAL 1 DAY)) AND FORMAT_DATE('%Y%m%d',CURRENT_DATE())) # one more day than dateToGather2 so we get cross midnight joins working. 
     GROUP BY purchase_transaction_id
     )
   FULL OUTER JOIN 
@@ -496,14 +493,14 @@ BEGIN
       ANY_VALUE((SELECT COALESCE(value.double_value, value.int_value) FROM UNNEST(event_params) WHERE key = 'value')) AS server_purchase_revenue,
       ANY_VALUE((SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'method')) AS server_purchase_method,
       COUNT(*) AS server_purchase_events,
-      MAX(event_date) AS server_purchase_event_date,
+      MAX(PARSE_DATE('%Y%m%d', event_date)) AS server_purchase_event_date,
     FROM `${ProjectID}.${DatasetID}.events_*` 
     WHERE event_name = 'server_purchase'
-    AND (datetogather IS NULL OR _table_suffix BETWEEN FORMAT_DATE('%Y%m%d',DATE_SUB(datetogather, INTERVAL 1 DAY)) AND FORMAT_DATE('%Y%m%d',CURRENT_DATE())) # one more day than datetogather so we get cross midnight joins working. 
+    AND (dateToGather2 IS NULL OR _table_suffix BETWEEN FORMAT_DATE('%Y%m%d',DATE_SUB(dateToGather2, INTERVAL 1 DAY)) AND FORMAT_DATE('%Y%m%d',CURRENT_DATE())) # one more day than dateToGather2 so we get cross midnight joins working. 
     GROUP BY server_purchase_transaction_id
     )
   ON purchase_transaction_id = server_purchase_transaction_id
-  WHERE (datetogather IS NULL OR PARSE_TIMESTAMP("%Y%m%d",IFNULL(purchase_event_date, server_purchase_event_date)) >= datetogather);
+  WHERE (dateToGather2 IS NULL OR IFNULL(purchase_event_date, server_purchase_event_date) >= dateToGather2);
 
   # Website Errors 
 
@@ -590,7 +587,7 @@ BEGIN
   SELECT 
     CURRENT_TIMESTAMP(),
     user_pseudo_id,
-    SAFE.TIMESTAMP_MICROS((SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'call_timestamp')) AS call_timestamp,
+    SAFE.TIMESTAMP_MILLIS((SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'call_timestamp')) AS call_timestamp,
     (SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'call_sequence') AS call_sequence,
     SAFE.TIMESTAMP_MICROS(event_timestamp) AS event_timestamp,
     event_date,
@@ -679,7 +676,7 @@ BEGIN
   SELECT 
     CURRENT_TIMESTAMP(),
     user_pseudo_id,
-    SAFE.TIMESTAMP_MICROS((SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'call_timestamp')) AS call_timestamp,
+    SAFE.TIMESTAMP_MILLIS((SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'call_timestamp')) AS call_timestamp,
     (SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'call_sequence') AS call_sequence,
     SAFE.TIMESTAMP_MICROS(event_timestamp) AS event_timestamp,
     event_date,
