@@ -817,7 +817,7 @@ BEGIN
 
       session_purchase_revenue,
       session_purchase_currency,
-      session_purchase_revenue_in_usd
+      session_purchase_revenue_in_usd,
 
       session_device_category,
       session_device_browser,
