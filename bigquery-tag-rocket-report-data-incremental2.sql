@@ -296,7 +296,7 @@ BEGIN
                 ANY_VALUE(user_pseudo_id) AS user_pseudo_id,
                 ANY_VALUE(geo.country) AS country,
                 ANY_VALUE(event_name) AS event_name,
-                SUM(ecommerce.purchase_revenue) AS session_revenue,
+                SUM(ecommerce.purchase_revenue) AS session_revenue, # TODO: if we use revenue need to also pull in the currency and the USD value. see the purchases query
                 MAX(
                   (
                     SELECT
@@ -725,7 +725,7 @@ BEGIN
     WHERE
       table_name = 'user_sessions'
       AND option_name = 'description'
-      AND option_value LIKE "%Version 5.0%" # queryVersion
+      AND option_value LIKE "%Version 5.1%" # queryVersion
   ) 
   THEN
     DROP TABLE IF EXISTS `${ProjectID}.tag_rocket.user_sessions`;
@@ -753,6 +753,7 @@ BEGIN
 
       session_purchase_revenue FLOAT64,
       session_purchase_currency STRING,
+      session_purchase_revenue_in_usd FLOAT64,
 
       session_device_category	STRING,
       session_device_browser	STRING,
@@ -775,7 +776,7 @@ BEGIN
       user_source	STRING,
     )
     PARTITION BY session_date
-    OPTIONS (description = 'Version 5.0'); # queryVersion
+    OPTIONS (description = 'Version 5.1'); # queryVersion
   END IF;
 
   ALTER TABLE `${ProjectID}.tag_rocket.user_sessions`
@@ -816,6 +817,7 @@ BEGIN
 
       session_purchase_revenue,
       session_purchase_currency,
+      session_purchase_revenue_in_usd
 
       session_device_category,
       session_device_browser,
@@ -866,6 +868,7 @@ BEGIN
     #SUM(IF(event_name = 'search',1,0)) AS session_search_count,
 
     SUM(ecommerce.purchase_revenue) AS session_purchase_revenue, # is this only present on the purchase event?
+    SUM(ecommerce.purchase_revenue_in_usd) AS session_purchase_revenue_in_usd, # is this only present on the purchase event?
 
     ANY_VALUE(IF(event_name = 'purchase',(SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'currency'), NULL)) AS session_purchase_currency,
 
