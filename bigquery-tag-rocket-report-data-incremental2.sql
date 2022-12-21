@@ -868,9 +868,10 @@ BEGIN
     #SUM(IF(event_name = 'search',1,0)) AS session_search_count,
 
     SUM(ecommerce.purchase_revenue) AS session_purchase_revenue, # is this only present on the purchase event?
+    ANY_VALUE(IF(event_name = 'purchase',(SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'currency'), NULL)) AS session_purchase_currency,
     SUM(ecommerce.purchase_revenue_in_usd) AS session_purchase_revenue_in_usd, # is this only present on the purchase event?
 
-    ANY_VALUE(IF(event_name = 'purchase',(SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'currency'), NULL)) AS session_purchase_currency,
+
 
     ANY_VALUE(device.category) AS session_device_category,
     ANY_VALUE(device.web_info.browser) AS session_device_browser,
