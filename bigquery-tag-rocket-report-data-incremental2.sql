@@ -353,7 +353,7 @@ BEGIN
     WHERE
       table_name = 'purchases'
       AND option_name = 'description'
-      AND option_value LIKE "%Version 5.0%" # queryVersion
+      AND option_value LIKE "%Version 5.1%" # queryVersion
   ) 
   THEN
     DROP TABLE IF EXISTS `${ProjectID}.tag_rocket.purchases`;  
@@ -365,13 +365,19 @@ BEGIN
       event_timestamp	TIMESTAMP,			
       event_date DATE,			## NEW WAY: DATE 
       purchase_event_timestamp	TIMESTAMP,			
-      purchase_revenue	FLOAT64,		
+      purchase_revenue	FLOAT64,	
+      purchase_currency	STRING,
       purchase_shipping_value FLOAT64,		
       purchase_tax_value FLOAT64,		
-      purchase_refund_value FLOAT64,		
+      purchase_refund_value FLOAT64,	
+      purchase_revenue_in_usd FLOAT64,
+      purchase_shipping_value_in_usd FLOAT64,
+      purchase_tax_value_in_usd FLOAT64,
+      purchase_refund_value_in_usd FLOAT64,	
       purchase_events	INT64,			
       server_purchase_event_timestamp	TIMESTAMP,			
-      server_purchase_revenue	FLOAT64,   
+      server_purchase_revenue	FLOAT64,
+      server_purchase_currency	STRING,   
       server_purchase_method	STRING,
       server_purchase_events	INT64,			
       device_browser	STRING,			
@@ -386,7 +392,7 @@ BEGIN
       user_ltv_currency	STRING
     )
     PARTITION BY event_date
-    OPTIONS (description = 'Version 5.0');  # queryVersion  
+    OPTIONS (description = 'Version 5.1');  # queryVersion  
   END IF;
 
   ALTER TABLE `${ProjectID}.tag_rocket.purchases`
@@ -412,12 +418,18 @@ BEGIN
       event_date,
       purchase_event_timestamp,
       purchase_revenue,
+      purchase_currency,
       purchase_shipping_value,
       purchase_tax_value,
       purchase_refund_value,
+      purchase_revenue_in_usd,
+      purchase_shipping_value_in_usd,
+      purchase_tax_value_in_usd,
+      purchase_refund_value_in_usd,
       purchase_events,
       server_purchase_event_timestamp,
       server_purchase_revenue,
+      server_purchase_currency,
       server_purchase_method,
       server_purchase_events,
       device_browser,
@@ -440,12 +452,18 @@ BEGIN
     IFNULL(purchase_event_date, server_purchase_event_date) AS event_date, ## NEW WAY: DATE
     purchase_event_timestamp,
     purchase_revenue,
+    purchase_currency,
     purchase_shipping_value,
     purchase_tax_value,
     purchase_refund_value,
+    purchase_revenue_in_usd,
+    purchase_shipping_value_in_usd,
+    purchase_tax_value_in_usd,
+    purchase_refund_value_in_usd,
     purchase_events,
     server_purchase_event_timestamp,
     server_purchase_revenue,
+    server_purchase_currency,
     server_purchase_method,
     server_purchase_events,
     device_browser,
@@ -466,9 +484,14 @@ BEGIN
       MAX(PARSE_DATE('%Y%m%d', event_date)) AS purchase_event_date,
       ecommerce.transaction_id AS purchase_transaction_id,
       ANY_VALUE(ecommerce.purchase_revenue) AS purchase_revenue,
+      ANY_VALUE((SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'currency')) AS purchase_currency,
       ANY_VALUE(ecommerce.shipping_value) AS purchase_shipping_value,
       ANY_VALUE(ecommerce.tax_value) AS purchase_tax_value,
       ANY_VALUE(ecommerce.refund_value) AS purchase_refund_value,
+      ANY_VALUE(ecommerce.purchase_revenue_in_usd) AS purchase_revenue_in_usd,
+      ANY_VALUE(ecommerce.shipping_value_in_usd) AS purchase_shipping_value_in_usd,
+      ANY_VALUE(ecommerce.tax_value_in_usd) AS purchase_tax_value_in_usd,
+      ANY_VALUE(ecommerce.refund_value_in_usd) AS purchase_refund_value_in_usd,
       COUNT(*) AS purchase_events,
       ANY_VALUE(device.web_info.browser) AS device_browser,
       ANY_VALUE(device.web_info.browser_version) AS device_browser_version,
@@ -490,6 +513,7 @@ BEGIN
       SAFE.TIMESTAMP_MICROS(ANY_VALUE(event_timestamp)) AS server_purchase_event_timestamp,
       (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'transaction_id') AS server_purchase_transaction_id,
       ANY_VALUE((SELECT COALESCE(value.double_value, value.int_value) FROM UNNEST(event_params) WHERE key = 'value')) AS server_purchase_revenue,
+      ANY_VALUE((SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'currency')) AS server_purchase_currency,
       ANY_VALUE((SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'method')) AS server_purchase_method,
       COUNT(*) AS server_purchase_events,
       MAX(PARSE_DATE('%Y%m%d', event_date)) AS server_purchase_event_date, ## NEW WAY: DATE
