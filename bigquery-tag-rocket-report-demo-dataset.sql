@@ -11,7 +11,7 @@ DECLARE dateToGather DEFAULT DATE_SUB(CURRENT_DATE(), INTERVAL 35 DAY);
 # meta data
 DROP TABLE IF EXISTS `web-site-advantage-ga4.tag_rocket_demo.meta_data`;
 CREATE TABLE `web-site-advantage-ga4.tag_rocket_demo.meta_data` 
-  OPTIONS (description = 'Version 5.0') # queryVersion
+  OPTIONS (description = 'Version 5.1') # queryVersion
   AS 
 SELECT
       'daily' AS schedule_frequency ,
@@ -19,11 +19,11 @@ SELECT
       'demo.com' AS store_front_name ,
       'https://demo.com/' AS store_front_url ,
       'Welcome' AS notification1_title ,
-      'The Tag Rocket report is available to subscribers of the Tag Rocket app for BigCommerce websites.' AS notification1_content ,
+      'The Tag Rocket report is available to subscribers of the Tag Rocket app for BigCommerce websites.' AS notification1_content,
       'normal' AS notification1_type , 
-      'Demo' AS notification2_title ,
-      'This version of the report uses demo data.' AS notification2_content ,
-      'normal' AS notification2_type ,
+      'Demo' AS notification2_title, # ignored by the report
+      'This version of the report uses demo data.' AS notification2_content, # ignored by the report
+      'normal' AS notification2_type, # ignored by the report
       '' AS notification3_title ,
       '' AS notification3_content ,
       'normal' AS notification3_type ,
@@ -31,7 +31,8 @@ SELECT
       partition_expiration ,	
       'web-site-advantage-ga4' AS bigquery_project_id ,	
       '' AS ga4_account_id ,	
-      '' AS ga4_property_id ,		
+      '' AS ga4_property_id ,	
+      '' AS last_report_version,		
       query_version	,			
       last_run_timestamp	
 FROM `macs4u-tag-rocket.tag_rocket_313969512.meta_data`;
