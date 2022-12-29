@@ -61,11 +61,12 @@ BEGIN
       partition_expiration STRING,	
       bigquery_project_id STRING,	
       ga4_account_id STRING,	
-      ga4_property_id STRING,		
-      query_version	STRING,			
+      ga4_property_id STRING,		  
+      last_report_version	STRING,	
+      query_version	STRING,				
       last_run_timestamp	TIMESTAMP
     )
-  OPTIONS (description = 'Version 5.0') # queryVersion
+  OPTIONS (description = 'Version 5.1') # queryVersion
   AS  
   SELECT * FROM (SELECT AS VALUE STRUCT(
     '', # schedule_frequency: how frequently the query is scheduled to run. e.g. "monthly", "every Monday", "manually"
@@ -86,7 +87,8 @@ BEGIN
     '', # bigquery_project_id
     '', # ga4_account_id
     '', # ga4_property_id
-    '5.0', # query_version queryVersion
+    '', # last_report_version
+    '5.1', # query_version queryVersion
     CURRENT_TIMESTAMP() # last_run_timestamp
   ));
 
