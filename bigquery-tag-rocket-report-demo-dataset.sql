@@ -1,4 +1,4 @@
-# Tag Rocket Report Demo Dataset v2.0
+# Tag Rocket Report Demo Dataset v2.1
 # https://github.com/Tiggerito/GA4-Scripts/blob/main/bigquery-tag-rocket-report-demo-dataset.sql
 
 # can only pull from datasets using the US multi region location
@@ -20,13 +20,13 @@ SELECT
       'https://demo.com/' AS store_front_url ,
       'Welcome' AS notification1_title ,
       'The Tag Rocket report is available to subscribers of the Tag Rocket app for BigCommerce websites.' AS notification1_content,
-      'normal' AS notification1_type , 
-      'Demo' AS notification2_title, # ignored by the report
-      'This version of the report uses demo data.' AS notification2_content, # ignored by the report
-      'normal' AS notification2_type, # ignored by the report
-      '' AS notification3_title ,
-      '' AS notification3_content ,
-      'normal' AS notification3_type ,
+      'warning' AS notification1_type , 
+      '' AS notification2_title, # ignored by the report
+      '' AS notification2_content, # ignored by the report
+      '' AS notification2_type, # ignored by the report
+      'Want to know more?' AS notification3_title ,
+      'Click on the giant Tag Rocket link in the footer to find out more.' AS notification3_content ,
+      'error' AS notification3_type ,
       last_exported,			     
       partition_expiration ,	
       'web-site-advantage-ga4' AS bigquery_project_id ,	
@@ -233,7 +233,7 @@ SELECT
       session_device_browser,
       session_device_operating_system,
       session_country,
-      REPLACE(CONCAT('https://demo.com/',REPLACE(LEFT(LOWER(TO_BASE64(SHA256(session_landing_page))), 30), '/', 'b')), '+', 'a') AS session_landing_page,	
+      IF(session_landing_page_type = 'home', 'https://demo.com/', REPLACE(CONCAT('https://demo.com/',REPLACE(LEFT(LOWER(TO_BASE64(SHA256(session_landing_page))), 30), '/', 'b')), '+', 'a')) AS session_landing_page,	
       session_landing_page_type,
       REPLACE(CONCAT('https://',REPLACE(LEFT(LOWER(TO_BASE64(SHA256(session_referrer))), 30), '/', 'b'),'.com'), '+', 'a') AS session_referrer,
 
@@ -284,7 +284,7 @@ SELECT
       last_updated,
       first_visit_timestamp,
       first_visit_day,
-      REPLACE(CONCAT('https://demo.com/',REPLACE(LEFT(LOWER(TO_BASE64(SHA256(first_landing_page))), 30), '/', 'b')), '+', 'a') AS first_landing_page,	
+      IF(first_landing_page_type = 'home', 'https://demo.com/', REPLACE(CONCAT('https://demo.com/',REPLACE(LEFT(LOWER(TO_BASE64(SHA256(first_landing_page))), 30), '/', 'b')), '+', 'a')) AS first_landing_page,	
       first_landing_page_type,
       REPLACE(CONCAT('https://',REPLACE(LEFT(LOWER(TO_BASE64(SHA256(first_referrer))), 30), '/', 'b'),'.com'), '+', 'a') AS first_referrer,
       customer,

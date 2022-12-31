@@ -887,6 +887,10 @@ BEGIN
     ARRAY_AGG(IF(event_name = 'page_view',(SELECT COALESCE(value.string_value, CAST(value.int_value AS STRING)) FROM UNNEST(event_params) WHERE key = 'page_type'), NULL) IGNORE NULLS ORDER BY event_timestamp LIMIT 1 )[OFFSET(0)] AS session_landing_page_type,
     ANY_VALUE(IF(event_name = 'session_start',(SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'page_referrer'), NULL)) AS session_referrer,
 
+    # https://websiteadvantage.atlassian.net/browse/REP-52
+    # should really get the first page_view value
+    # and then re-process to get first non direct
+
     ANY_VALUE((SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'campaign')) AS session_campaign,
     ANY_VALUE((SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'source')) AS session_source,
     ANY_VALUE((SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'medium')) AS session_medium,
