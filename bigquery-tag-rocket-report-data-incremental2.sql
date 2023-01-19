@@ -1,4 +1,4 @@
-# Tag Rocket Report Data Incremental 2 v5.0
+# Tag Rocket Report Data Incremental 2 v5.1
 # https://github.com/Tiggerito/GA4-Scripts/blob/main/bigquery-tag-rocket-report-data-incremental2.sql
 
 # Replace all occurances of ${DatasetID} with your Dataset ID for the GA4 export. Something like analytics_1234567890
@@ -279,10 +279,10 @@ BEGIN
             (
               SELECT
                 (SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'ga_session_id') AS ga_session_id, # can be null in consent mode making grouping bad ?
-                (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'metric_id') AS metric_id,
+                (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'metric_id') AS metric_id, # unique to a page/metric
 
-                SAFE.TIMESTAMP_MILLIS(ANY_VALUE((SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'call_timestamp'))) AS call_timestamp,
-                ANY_VALUE((SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'call_sequence')) AS call_sequence,
+                SAFE.TIMESTAMP_MILLIS(ANY_VALUE((SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'call_timestamp'))) AS call_timestamp, # not sure what use this has. We also have event_timestamp
+                ANY_VALUE((SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'call_sequence')) AS call_sequence, # not sure what use this has especially when set to ANY_VALUE
                 SAFE.TIMESTAMP_MILLIS(ANY_VALUE((SELECT CAST(COALESCE(value.double_value, value.int_value) AS INT64) FROM UNNEST(event_params) WHERE key = 'page_timestamp'))) AS page_timestamp,
                 ANY_VALUE(device.category) AS device_category,
                 ANY_VALUE(device.operating_system) AS device_os,
@@ -294,7 +294,15 @@ BEGIN
                     (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'page_location'),
                     r'^[^?]+')) AS page_path,
                 
-                ARRAY_TO_STRING([ANY_VALUE((SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'debug_target')), ANY_VALUE((SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'debug_target2'))], '') AS debug_target,
+                # I think using ANY_VALUE here is wrong
+                ARRAY_AGG(
+                  ARRAY_TO_STRING([(SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'debug_target'), (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'debug_target2')], '')
+                   IGNORE NULLS ORDER BY (
+                    SELECT COALESCE(value.double_value, value.int_value)
+                    FROM UNNEST(event_params)
+                    WHERE key = 'metric_value'
+                  ) DESC LIMIT 1 )[OFFSET(0)] AS debug_target,
+              #  ARRAY_TO_STRING([ANY_VALUE((SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'debug_target')), ANY_VALUE((SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'debug_target2'))], '') AS debug_target,
                 ANY_VALUE(user_pseudo_id) AS user_pseudo_id,
                 ANY_VALUE(geo.country) AS country,
                 ANY_VALUE(event_name) AS event_name,
@@ -307,7 +315,7 @@ BEGIN
                     FROM UNNEST(event_params)
                     WHERE key = 'session_engaged'
                   )) AS session_engaged,
-                SAFE.TIMESTAMP_MICROS(MAX(event_timestamp)) AS event_timestamp,
+                SAFE.TIMESTAMP_MICROS(MAX(event_timestamp)) AS event_timestamp, # the last event for that metric on that page
                 MAX(PARSE_DATE('%Y%m%d', event_date)) AS event_date,
                 MAX(
                   (
@@ -328,7 +336,7 @@ BEGIN
                   ANY_VALUE((SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'width')) AS width,
                   ANY_VALUE((SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'height')) AS height
               FROM
-                `${ProjectID}.${DatasetID}.events_*`
+                `${ProjectID}.${DatasetID}.events_*` # this could pick up the intraday table if it exists?
               WHERE
                 event_name IN ('LCP', 'FID', 'CLS', 'TTFB', 'FCP', 'INP', 'first_visit', 'purchase')
                 AND (dateToGather IS NULL OR _table_suffix BETWEEN FORMAT_DATE('%Y%m%d',DATE_SUB(dateToGather, INTERVAL 1 DAY)) AND FORMAT_DATE('%Y%m%d',CURRENT_DATE()))                  
@@ -505,7 +513,7 @@ BEGIN
       ANY_VALUE(traffic_source.source) AS traffic_source, 
       ANY_VALUE(user_ltv.revenue) AS user_ltv_revenue, 
       ANY_VALUE(user_ltv.currency) AS user_ltv_currency
-    FROM `${ProjectID}.${DatasetID}.events_*` 
+    FROM `${ProjectID}.${DatasetID}.events_*`  # this could pick up the intraday table if it exists?
     WHERE event_name = 'purchase'
     AND (dateToGather IS NULL OR _table_suffix BETWEEN FORMAT_DATE('%Y%m%d',DATE_SUB(dateToGather, INTERVAL 1 DAY)) AND FORMAT_DATE('%Y%m%d',CURRENT_DATE())) # one more day than dateToGather so we get cross midnight joins working. 
     GROUP BY purchase_transaction_id
@@ -519,7 +527,7 @@ BEGIN
       ANY_VALUE((SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'method')) AS server_purchase_method,
       COUNT(*) AS server_purchase_events,
       MAX(PARSE_DATE('%Y%m%d', event_date)) AS server_purchase_event_date, ## NEW WAY: DATE
-    FROM `${ProjectID}.${DatasetID}.events_*` 
+    FROM `${ProjectID}.${DatasetID}.events_*`  # this could pick up the intraday table if it exists?
     WHERE event_name = 'server_purchase'
     AND (dateToGather IS NULL OR _table_suffix BETWEEN FORMAT_DATE('%Y%m%d',DATE_SUB(dateToGather, INTERVAL 1 DAY)) AND FORMAT_DATE('%Y%m%d',CURRENT_DATE())) # one more day than dateToGather so we get cross midnight joins working. 
     GROUP BY server_purchase_transaction_id
@@ -631,7 +639,7 @@ BEGIN
     (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'error_lineno') AS error_lineno,
     (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'error_colno') AS error_colno,
     (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'error_object_type') AS error_object_type
-  FROM `${ProjectID}.${DatasetID}.events_*` 
+  FROM `${ProjectID}.${DatasetID}.events_*`  # this could pick up the intraday table if it exists?
   WHERE event_name = 'exception'
   AND (dateToGather IS NULL OR _table_suffix BETWEEN FORMAT_DATE('%Y%m%d',dateToGather) AND FORMAT_DATE('%Y%m%d',CURRENT_DATE()));
 
@@ -712,7 +720,7 @@ BEGIN
     (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'page_location') AS page_location,
     (SELECT COALESCE(value.string_value, CAST(value.int_value AS STRING)) FROM UNNEST(event_params) WHERE key = 'page_type') AS page_type,
     (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'page_referrer') AS page_referrer
-  FROM `${ProjectID}.${DatasetID}.events_*` 
+  FROM `${ProjectID}.${DatasetID}.events_*`  # this could pick up the intraday table if it exists?
   WHERE event_name = 'page_view'
   AND (dateToGather IS NULL OR _table_suffix BETWEEN FORMAT_DATE('%Y%m%d',dateToGather) AND FORMAT_DATE('%Y%m%d',CURRENT_DATE()));
 
@@ -905,7 +913,7 @@ BEGIN
     ANY_VALUE(traffic_source.name)	AS user_campaign,
     ANY_VALUE(traffic_source.medium)	AS user_medium,
     ANY_VALUE(traffic_source.source)	AS user_source
-  FROM `${ProjectID}.${DatasetID}.events_*` 
+  FROM `${ProjectID}.${DatasetID}.events_*`  # this could pick up the intraday table if it exists?
   WHERE event_name IN ('session_start', 'page_view', 'purchase', 'add_to_cart', 'begin_checkout', 'view_cart', 'view_item', 'view_item_list', 'first_visit', 'select_item', 'add_customer_info', 'add_shipping_info', 'add_billing_info')
   AND (dateToGather IS NULL OR _table_suffix BETWEEN FORMAT_DATE('%Y%m%d',dateToGather) AND FORMAT_DATE('%Y%m%d',CURRENT_DATE()))
   AND user_pseudo_id IS NOT NULL
