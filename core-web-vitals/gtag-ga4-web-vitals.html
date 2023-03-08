@@ -1,11 +1,7 @@
 <script id="web-vitals-ga4">
 /*
- * Send Core Web Vitals to Google Analytics 4 
- * 
- * https://github.com/GoogleChrome/web-vitals#using-gtagjs-google-analytics-4
- * 
- * Modified to use attribution and rating data
- * 
+ * Send Core Web Vitals to Google Analytics 4 using gtag
+ * v3.1
  */
 function sendToGoogleAnalytics({name, delta, value, id, entries, rating, attribution}) {
   // Assumes the global `gtag()` function exists, see:
@@ -26,8 +22,7 @@ function sendToGoogleAnalytics({name, delta, value, id, entries, rating, attribu
     // metric_rating: 'good' | 'needs-improvement' | 'poor'. 'needs-improvement' was 'ni'
     metric_rating: rating, 
     // debug_info
-    debug_target: debugTarget.substring(0,100),
-    debug_target2: debugTarget.substring(100),
+    debug_target: debugTarget,
     debug_event: attribution ? attribution.eventType||'' : '',
     debug_timing: attribution ? attribution.loadState||'' : '',
     event_time: attribution ? attribution.largestShiftTime||(attribution.lcpEntry&&attribution.lcpEntry.startTime)||attribution.eventTime||'': ''
