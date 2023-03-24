@@ -1,4 +1,4 @@
-# Tag Rocket Report Data Incremental 2 v5.1
+# Tag Rocket Report Data Incremental 2 v5.2
 # https://github.com/Tiggerito/GA4-Scripts/blob/main/bigquery-tag-rocket-report-data-incremental2.sql
 
 # Replace all occurances of ${DatasetID} with your Dataset ID for the GA4 export. Something like analytics_1234567890
@@ -130,7 +130,7 @@ BEGIN
       call_timestamp TIMESTAMP,
       call_sequence INT64,
       page_timestamp TIMESTAMP,
-      ga_session_id	INT64,			
+      ga_session_id	INT64,	
       user_type	STRING,			
       session_engagement	STRING,			
       country	STRING,			
@@ -278,7 +278,7 @@ BEGIN
           FROM
             (
               SELECT
-                (SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'ga_session_id') AS ga_session_id, # can be null in consent mode making grouping bad ?
+                (SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'ga_session_id') AS ga_session_id, # nulls are filtered out 
                 (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'metric_id') AS metric_id, # unique to a page/metric
 
                 SAFE.TIMESTAMP_MILLIS(ANY_VALUE((SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'call_timestamp'))) AS call_timestamp, # not sure what use this has. We also have event_timestamp
@@ -303,7 +303,7 @@ BEGIN
                     WHERE key = 'metric_value'
                   ) DESC LIMIT 1 )[OFFSET(0)] AS debug_target,
               #  ARRAY_TO_STRING([ANY_VALUE((SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'debug_target')), ANY_VALUE((SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'debug_target2'))], '') AS debug_target,
-                ANY_VALUE(user_pseudo_id) AS user_pseudo_id,
+                ANY_VALUE(user_pseudo_id) AS user_pseudo_id,                
                 ANY_VALUE(geo.country) AS country,
                 ANY_VALUE(event_name) AS event_name,
                 SUM(ecommerce.purchase_revenue) AS session_revenue, # TODO: if we use revenue need to also pull in the currency and the USD value. see the purchases query
@@ -323,7 +323,6 @@ BEGIN
                     FROM UNNEST(event_params)
                     WHERE key = 'metric_value'
                   )) AS metric_value,
-
 
                   ANY_VALUE((SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'metric_rating')) AS metric_rating,
                   ANY_VALUE((SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'page_location')) AS page_location,
@@ -346,7 +345,7 @@ BEGIN
         )
       WHERE
         ga_session_id IS NOT NULL
-      GROUP BY ga_session_id # can be null in consent mode making grouping bad ?
+      GROUP BY ga_session_id 
     )
   CROSS JOIN UNNEST(events) AS evt
   WHERE evt.event_name NOT IN ('first_visit', 'purchase')
@@ -735,13 +734,14 @@ BEGIN
     WHERE
       table_name = 'user_sessions'
       AND option_name = 'description'
-      AND option_value LIKE "%Version 5.1%" # queryVersion
+      AND option_value LIKE "%Version 5.2%" # queryVersion
   ) 
   THEN
     DROP TABLE IF EXISTS `${ProjectID}.tag_rocket.user_sessions`;
     CREATE TABLE `${ProjectID}.tag_rocket.user_sessions` (
+      unique_session_id STRING,
       user_pseudo_id STRING,
-      ga_session_id INT64,
+      ga_session_id INT64,     
       last_updated TIMESTAMP,
       session_date DATE,
       session_start_timestamp TIMESTAMP,
@@ -786,7 +786,7 @@ BEGIN
       user_source	STRING,
     )
     PARTITION BY session_date
-    OPTIONS (description = 'Version 5.1'); # queryVersion
+    OPTIONS (description = 'Version 5.2'); # queryVersion
   END IF;
 
   ALTER TABLE `${ProjectID}.tag_rocket.user_sessions`
@@ -804,8 +804,9 @@ BEGIN
 
   INSERT `${ProjectID}.tag_rocket.user_sessions` 
   (  
+      unique_session_id,
       user_pseudo_id,
-      ga_session_id,
+      ga_session_id,    
       last_updated,
       session_date,
       session_start_timestamp,
@@ -850,7 +851,7 @@ BEGIN
       user_source
   )
   SELECT 
-    
+    CONCAT(user_pseudo_id,".",(select value.int_value from unnest(event_params) where key = 'ga_session_id')) as unique_session_id,
     user_pseudo_id,
     (SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'ga_session_id') AS ga_session_id, # not unique, but is per user_pseudo_id
     CURRENT_TIMESTAMP(),
@@ -881,8 +882,6 @@ BEGIN
     ANY_VALUE(IF(event_name = 'purchase',(SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'currency'), NULL)) AS session_purchase_currency,
     SUM(ecommerce.purchase_revenue_in_usd) AS session_purchase_revenue_in_usd, # is this only present on the purchase event?
 
-
-
     ANY_VALUE(device.category) AS session_device_category,
     ANY_VALUE(device.web_info.browser) AS session_device_browser,
     ANY_VALUE(device.operating_system) AS session_device_operating_system,
@@ -905,7 +904,6 @@ BEGIN
     ANY_VALUE((SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'term')) AS session_term,
     ANY_VALUE((SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'gclid')) AS session_gclid,
 
-
     ANY_VALUE((SELECT value.string_value FROM UNNEST(user_properties) WHERE key = 'customer_group_name')) AS customer_group_name,
     MAX(user_ltv.revenue) AS	user_ltv_revenue,
     MAX(user_ltv.currency) AS user_ltv_currency,
@@ -917,7 +915,8 @@ BEGIN
   WHERE event_name IN ('session_start', 'page_view', 'purchase', 'add_to_cart', 'begin_checkout', 'view_cart', 'view_item', 'view_item_list', 'first_visit', 'select_item', 'add_customer_info', 'add_shipping_info', 'add_billing_info')
   AND (dateToGather IS NULL OR _table_suffix BETWEEN FORMAT_DATE('%Y%m%d',dateToGather) AND FORMAT_DATE('%Y%m%d',CURRENT_DATE()))
   AND user_pseudo_id IS NOT NULL
-  GROUP BY 1, 2
+  AND (SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'ga_session_id') IS NOT NULL
+  GROUP BY 1,2,3
   HAVING session_page_view_count > 0; 
 
   # Users
@@ -931,7 +930,7 @@ BEGIN
     WHERE
       table_name = 'users'
       AND option_name = 'description'
-      AND option_value LIKE "%Version 5.0%" # queryVersion
+      AND option_value LIKE "%Version 5.2%" # queryVersion
   ) 
   THEN
     DROP TABLE IF EXISTS `${ProjectID}.tag_rocket.users`;
@@ -949,11 +948,12 @@ BEGIN
       customer BOOL,
       last_active TIMESTAMP,
       first_purchase_ga_session_id INT64,
+      first_purchase_unique_session_id STRING,
       user_ltv_revenue FLOAT64,
       user_ltv_currency STRING
     )
     PARTITION BY first_visit_day
-    OPTIONS (description = 'Version 5.0'); # queryVersion
+    OPTIONS (description = 'Version 5.2'); # queryVersion
   END IF;
 
 # keep users forever
@@ -986,6 +986,7 @@ BEGIN
     ANY_VALUE(user_source) AS user_source,# only set on creation
     SUM(session_purchase_count) AS purchase_count,
     MIN(IF(session_purchase_count > 0, ga_session_id, NULL)) AS first_purchase_ga_session_id,
+    CONCAT(user_pseudo_id,".",MIN(IF(session_purchase_count > 0, ga_session_id, NULL))) as first_purchase_unique_session_id,
     ARRAY_AGG(user_ltv_revenue IGNORE NULLS ORDER BY session_start_timestamp DESC LIMIT 1 )[OFFSET(0)] AS user_ltv_revenue,
     ARRAY_AGG(user_ltv_currency IGNORE NULLS ORDER BY session_start_timestamp DESC LIMIT 1 )[OFFSET(0)] AS user_ltv_currency
   FROM `${ProjectID}.tag_rocket.user_sessions` 
@@ -1001,7 +1002,8 @@ BEGIN
     A.last_active = B.last_active,
     A.user_ltv_revenue = B.user_ltv_revenue,
     A.user_ltv_currency = B.user_ltv_currency,
-    A.first_purchase_ga_session_id = IFNULL(A.first_purchase_ga_session_id, B.first_purchase_ga_session_id)
+    A.first_purchase_ga_session_id = IFNULL(A.first_purchase_ga_session_id, B.first_purchase_ga_session_id),
+    A.first_purchase_unique_session_id = IFNULL(A.first_purchase_unique_session_id, B.first_purchase_unique_session_id)
   WHEN NOT MATCHED THEN INSERT (
       user_pseudo_id,
       last_updated,
@@ -1016,6 +1018,7 @@ BEGIN
       customer,
       last_active,
       first_purchase_ga_session_id,
+      first_purchase_unique_session_id,
       user_ltv_revenue,
       user_ltv_currency
   )
@@ -1033,6 +1036,7 @@ BEGIN
     purchase_count > 0,
     last_active,
     first_purchase_ga_session_id,
+    first_purchase_unique_session_id,
     user_ltv_revenue,
     user_ltv_currency
   );
