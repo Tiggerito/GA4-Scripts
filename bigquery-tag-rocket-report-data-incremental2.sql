@@ -734,7 +734,7 @@ BEGIN
     WHERE
       table_name = 'user_sessions'
       AND option_name = 'description'
-      AND option_value LIKE "%Version 5.2%" # queryVersion
+      AND option_value LIKE "%Version 5.2b%" # queryVersion
   ) 
   THEN
     DROP TABLE IF EXISTS `${ProjectID}.tag_rocket.user_sessions`;
@@ -786,7 +786,7 @@ BEGIN
       user_source	STRING,
     )
     PARTITION BY session_date
-    OPTIONS (description = 'Version 5.2'); # queryVersion
+    OPTIONS (description = 'Version 5.2b'); # queryVersion
   END IF;
 
   ALTER TABLE `${ProjectID}.tag_rocket.user_sessions`
@@ -797,9 +797,9 @@ BEGIN
   IF dateToGather IS NOT NULL THEN
     DELETE FROM `${ProjectID}.tag_rocket.user_sessions` WHERE session_date >= dateToGather;
   ELSE
-    IF maxDaysToLookBackOnInitialQuery IS NOT NULL THEN
-       SET dateToGather = DATE_SUB(CURRENT_DATE(), INTERVAL maxDaysToLookBackOnInitialQuery DAY);
-    END IF;
+    #IF maxDaysToLookBackOnInitialQuery IS NOT NULL THEN
+    #   SET dateToGather = DATE_SUB(CURRENT_DATE(), INTERVAL maxDaysToLookBackOnInitialQuery DAY);
+    #END IF;
   END IF;
 
   INSERT `${ProjectID}.tag_rocket.user_sessions` 
@@ -930,7 +930,7 @@ BEGIN
     WHERE
       table_name = 'users'
       AND option_name = 'description'
-      AND option_value LIKE "%Version 5.2%" # queryVersion
+      AND option_value LIKE "%Version 5.2b%" # queryVersion
   ) 
   THEN
     DROP TABLE IF EXISTS `${ProjectID}.tag_rocket.users`;
@@ -953,7 +953,7 @@ BEGIN
       user_ltv_currency STRING
     )
     PARTITION BY first_visit_day
-    OPTIONS (description = 'Version 5.2'); # queryVersion
+    OPTIONS (description = 'Version 5.2b'); # queryVersion
   END IF;
 
 # keep users forever

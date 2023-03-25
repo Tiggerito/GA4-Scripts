@@ -1,4 +1,4 @@
-# Tag Rocket Report Demo Dataset v2.1
+# Tag Rocket Report Demo Dataset v5.2
 # https://github.com/Tiggerito/GA4-Scripts/blob/main/bigquery-tag-rocket-report-demo-dataset.sql
 
 # can only pull from datasets using the US multi region location
@@ -203,9 +203,10 @@ WHERE event_date > dateToGather;
 DROP TABLE IF EXISTS `web-site-advantage-ga4.tag_rocket_demo.user_sessions`;
 CREATE TABLE `web-site-advantage-ga4.tag_rocket_demo.user_sessions`
     PARTITION BY session_date
-    OPTIONS (description = 'Version 5.1') # queryVersion
+    OPTIONS (description = 'Version 5.2') # queryVersion
 AS 
 SELECT
+      unique_session_id,
       user_pseudo_id,
       ga_session_id,
       last_updated,
@@ -277,7 +278,7 @@ WHERE session_date > dateToGather;
 DROP TABLE IF EXISTS `web-site-advantage-ga4.tag_rocket_demo.users`;
 CREATE TABLE `web-site-advantage-ga4.tag_rocket_demo.users`
     PARTITION BY first_visit_day
-    OPTIONS (description = 'Version 5.0') # queryVersion
+    OPTIONS (description = 'Version 5.2') # queryVersion
 AS 
 SELECT
       user_pseudo_id,
@@ -290,6 +291,7 @@ SELECT
       customer,
       last_active,
       first_purchase_ga_session_id,
+      first_purchase_unique_session_id,
       user_ltv_revenue * 5 AS user_ltv_revenue,
       user_ltv_currency,
       IF(STARTS_WITH(user_campaign,'('), user_campaign, CONCAT('Campaign ', MOD(UNIX_SECONDS(first_visit_timestamp), 9)+1)) AS user_campaign,
