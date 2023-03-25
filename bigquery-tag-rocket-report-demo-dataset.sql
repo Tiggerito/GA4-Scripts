@@ -203,7 +203,7 @@ WHERE event_date > dateToGather;
 DROP TABLE IF EXISTS `web-site-advantage-ga4.tag_rocket_demo.user_sessions`;
 CREATE TABLE `web-site-advantage-ga4.tag_rocket_demo.user_sessions`
     PARTITION BY session_date
-    OPTIONS (description = 'Version 5.2') # queryVersion
+    OPTIONS (description = 'Version 5.2b') # queryVersion
 AS 
 SELECT
       unique_session_id,
@@ -271,14 +271,14 @@ SELECT
         WHEN 'referral' THEN 'referral'
         ELSE CONCAT('Medium ', MOD(ga_session_id, 9)+1) 
       END AS user_medium
-FROM `macs4u-tag-rocket.tag_rocket_313969512.user_sessions`
-WHERE session_date > dateToGather;
+FROM `macs4u-tag-rocket.tag_rocket_313969512.user_sessions`;
+#WHERE session_date > dateToGather;
 
 # Users
 DROP TABLE IF EXISTS `web-site-advantage-ga4.tag_rocket_demo.users`;
 CREATE TABLE `web-site-advantage-ga4.tag_rocket_demo.users`
     PARTITION BY first_visit_day
-    OPTIONS (description = 'Version 5.2') # queryVersion
+    OPTIONS (description = 'Version 5.2b') # queryVersion
 AS 
 SELECT
       user_pseudo_id,
