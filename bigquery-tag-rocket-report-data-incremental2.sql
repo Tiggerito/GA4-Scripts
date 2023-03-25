@@ -88,7 +88,7 @@ BEGIN
     '', # ga4_account_id
     '', # ga4_property_id
     '', # last_report_version
-    '5.1', # query_version queryVersion
+    '5.2', # query_version queryVersion
     CURRENT_TIMESTAMP() # last_run_timestamp
   ));
 
