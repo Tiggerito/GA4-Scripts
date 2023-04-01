@@ -734,14 +734,15 @@ BEGIN
     WHERE
       table_name = 'user_sessions'
       AND option_name = 'description'
-      AND option_value LIKE "%Version 5.2b%" # queryVersion
+      AND option_value LIKE "%Version 5.2c%" # queryVersion
   ) 
   THEN
     DROP TABLE IF EXISTS `${ProjectID}.tag_rocket.user_sessions`;
     CREATE TABLE `${ProjectID}.tag_rocket.user_sessions` (
       unique_session_id STRING,
       user_pseudo_id STRING,
-      ga_session_id INT64,     
+      ga_session_id INT64,  
+      session_date_pt DATE,   
       last_updated TIMESTAMP,
       session_date DATE,
       session_start_timestamp TIMESTAMP,
@@ -760,11 +761,9 @@ BEGIN
       session_add_shipping_info_count INT64,
       session_add_billing_info_count INT64,
       session_purchase_count INT64,
-
       session_purchase_revenue FLOAT64,
       session_purchase_currency STRING,
       session_purchase_revenue_in_usd FLOAT64,
-
       session_device_category	STRING,
       session_device_browser	STRING,
       session_device_operating_system	STRING,
@@ -777,16 +776,16 @@ BEGIN
       session_medium	STRING,
       session_term	STRING,
       session_gclid	STRING,
+      session_engaged	BOOL,
       customer_group_name	STRING,
-
       user_ltv_revenue	FLOAT64,
       user_ltv_currency	STRING,
       user_campaign	STRING,
       user_medium	STRING,
       user_source	STRING,
     )
-    PARTITION BY session_date
-    OPTIONS (description = 'Version 5.2b'); # queryVersion
+    PARTITION BY session_date_pt
+    OPTIONS (description = 'Version 5.2c'); # queryVersion
   END IF;
 
   ALTER TABLE `${ProjectID}.tag_rocket.user_sessions`
@@ -806,7 +805,8 @@ BEGIN
   (  
       unique_session_id,
       user_pseudo_id,
-      ga_session_id,    
+      ga_session_id, 
+      session_date_pt,   
       last_updated,
       session_date,
       session_start_timestamp,
@@ -842,6 +842,7 @@ BEGIN
       session_medium,
       session_term,
       session_gclid,
+      session_engaged,
       customer_group_name,
 
       user_ltv_revenue,
@@ -854,6 +855,7 @@ BEGIN
     CONCAT(user_pseudo_id,".",(select value.int_value from unnest(event_params) where key = 'ga_session_id')) as unique_session_id,
     user_pseudo_id,
     (SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'ga_session_id') AS ga_session_id, # not unique, but is per user_pseudo_id
+    EXTRACT(DATE FROM SAFE.TIMESTAMP_MICROS(MIN(event_timestamp)) AT TIME ZONE 'US/Pacific') AS session_date_pt, 
     CURRENT_TIMESTAMP(),
     MIN(PARSE_DATE('%Y%m%d', event_date)) AS session_date,  
     SAFE.TIMESTAMP_MICROS(MIN(event_timestamp)) AS session_start_timestamp, 
@@ -903,6 +905,15 @@ BEGIN
     ANY_VALUE((SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'medium')) AS session_medium,
     ANY_VALUE((SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'term')) AS session_term,
     ANY_VALUE((SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'gclid')) AS session_gclid,
+
+    IF(MAX(
+    (
+      SELECT
+        COALESCE(
+          value.double_value, value.int_value, CAST(value.string_value AS NUMERIC))
+      FROM UNNEST(event_params)
+      WHERE key = 'session_engaged'
+    )) > 0, true, false) AS session_engaged,
 
     ANY_VALUE((SELECT value.string_value FROM UNNEST(user_properties) WHERE key = 'customer_group_name')) AS customer_group_name,
     MAX(user_ltv.revenue) AS	user_ltv_revenue,

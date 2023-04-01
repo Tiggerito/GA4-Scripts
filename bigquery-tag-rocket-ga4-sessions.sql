@@ -44,6 +44,7 @@ BEGIN
   THEN
     DROP TABLE IF EXISTS `${ProjectID}.tag_rocket.user_sessions`;
     CREATE TABLE `${ProjectID}.tag_rocket.user_sessions` (
+      unique_session_id STRING,
       user_pseudo_id STRING,
       ga_session_id INT64,
       session_date_pt DATE,
@@ -109,6 +110,7 @@ BEGIN
   # add the new data for the last few days
   INSERT `${ProjectID}.tag_rocket.user_sessions` 
   (  
+      unique_session_id,
       user_pseudo_id,
       ga_session_id,
       session_date_pt,
@@ -153,7 +155,7 @@ BEGIN
       user_source
   )
   SELECT 
-    
+    CONCAT(user_pseudo_id,".",(select value.int_value from unnest(event_params) where key = 'ga_session_id')) as unique_session_id,
     user_pseudo_id,
     (SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'ga_session_id') AS ga_session_id, # not unique, but is per user_pseudo_id
     EXTRACT(DATE FROM SAFE.TIMESTAMP_MICROS(MIN(event_timestamp)) AT TIME ZONE 'US/Pacific') AS session_date_pt, 
@@ -207,7 +209,8 @@ BEGIN
   WHERE event_name IN ('session_start', 'page_view', 'purchase', 'add_to_cart', 'begin_checkout', 'view_cart', 'view_item', 'view_item_list', 'first_visit', 'select_item', 'add_customer_info', 'add_shipping_info', 'add_billing_info')
   AND (dateToGather IS NULL OR _table_suffix BETWEEN FORMAT_DATE('%Y%m%d',dateToGather) AND FORMAT_DATE('%Y%m%d',CURRENT_DATE()))
   AND user_pseudo_id IS NOT NULL
-  GROUP BY 1, 2
+  AND (SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'ga_session_id') IS NOT NULL
+  GROUP BY 1, 2,3
   HAVING session_page_view_count > 0; 
   
 END;
