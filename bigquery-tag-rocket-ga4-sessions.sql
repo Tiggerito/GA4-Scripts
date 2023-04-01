@@ -1,4 +1,4 @@
-# Tag Rocket GA4 Sessions table v5.7
+# Tag Rocket GA4 Sessions table v5.8
 # https://github.com/Tiggerito/GA4-Scripts/blob/main/bigquery-tag-rocket-ga4-sessions.sql
 
 # Replace all occurances of ${ProjectID} with your Project ID for the GA4 export.
@@ -39,7 +39,7 @@ BEGIN
     WHERE
       table_name = 'user_sessions'
       AND option_name = 'description'
-      AND option_value LIKE "%Version 5.7%" # queryVersion
+      AND option_value LIKE "%Version 5.8%" # queryVersion
   ) 
   THEN
     DROP TABLE IF EXISTS `${ProjectID}.tag_rocket.user_sessions`;
@@ -89,7 +89,7 @@ BEGIN
       user_source	STRING,
     )
     PARTITION BY session_date_pt
-    OPTIONS (description = 'Version 5.7'); # queryVersion
+    OPTIONS (description = 'Version 5.8'); # queryVersion
   END IF;
 
   ALTER TABLE `${ProjectID}.tag_rocket.user_sessions`
