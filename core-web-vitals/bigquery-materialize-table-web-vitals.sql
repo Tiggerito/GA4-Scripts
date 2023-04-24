@@ -1,13 +1,14 @@
-# Web Vitals Materialised Table v3.3
+# Web Vitals Materialised Table v3.4
 # https://github.com/Tiggerito/GA4-Scripts/blob/main/core-web-vitals/bigquery-materialize-table-web-vitals.sql
 
 # Replace all occurances of DatasetID with your Dataset ID
 
-CREATE OR REPLACE TABLE `DatasetID.web_vitals_summary` # Replace DatasetID with your Dataset ID
+CREATE OR REPLACE TABLE `${ProjectID}.${DatasetID}.web_vitals_summary` # Replace DatasetID with your Dataset ID
   PARTITION BY DATE(event_timestamp)
   CLUSTER BY metric_name
 AS
 SELECT
+  CURRENT_TIMESTAMP() AS last_updated,
   ga_session_id,
   IF(
     EXISTS(SELECT 1 FROM UNNEST(events) AS e WHERE e.event_name = 'first_visit'),
@@ -18,7 +19,6 @@ SELECT
     AS session_engagement,
   evt.* EXCEPT (session_engaged, event_name),
   event_name AS metric_name,
-  FORMAT_TIMESTAMP('%Y%m%d', event_timestamp) AS event_date,
   
   # Tony's additions 1 START
   CASE metric_rating
@@ -41,6 +41,9 @@ FROM
           ga_session_id,
           STRUCT(
             country,
+            call_timestamp,
+            call_sequence,
+            page_timestamp,
             device_category,
             device_os,
             traffic_medium,
@@ -50,6 +53,7 @@ FROM
             # Tony's modification to support long debug_target
             IF(debug_target2 IS NULL, debug_target, CONCAT(debug_target, debug_target2)) AS debug_target,
             event_timestamp,
+            event_date,
             event_name,
             metric_id,
             # Tony's modification to also support TTFB and FCP
@@ -77,6 +81,11 @@ FROM
             SELECT
               (SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'ga_session_id') AS ga_session_id, # can be null in consent mode
               (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'metric_id') AS metric_id,
+
+              SAFE.TIMESTAMP_MILLIS(ANY_VALUE((SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'call_timestamp'))) AS call_timestamp, # not sure what use this has. We also have event_timestamp
+              ANY_VALUE((SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'call_sequence')) AS call_sequence, # not sure what use this has especially when set to ANY_VALUE
+              SAFE.TIMESTAMP_MILLIS(ANY_VALUE((SELECT CAST(COALESCE(value.double_value, value.int_value) AS INT64) FROM UNNEST(event_params) WHERE key = 'page_timestamp'))) AS page_timestamp,
+
               ANY_VALUE(device.category) AS device_category,
               ANY_VALUE(device.operating_system) AS device_os,
               ANY_VALUE(traffic_source.medium) AS traffic_medium,
@@ -107,6 +116,7 @@ FROM
                   WHERE key = 'session_engaged'
                 )) AS session_engaged,
               TIMESTAMP_MICROS(MAX(event_timestamp)) AS event_timestamp,
+              MAX(PARSE_DATE('%Y%m%d', event_date)) AS event_date,
               MAX(
                 (
                   SELECT COALESCE(value.double_value, value.int_value)
@@ -128,7 +138,7 @@ FROM
                 # Tony's additions 3 END
 
             FROM
-              `DatasetID.events_*` # Replace DatasetID with your Dataset ID
+              `${ProjectID}.${DatasetID}.events_*` # Replace DatasetID with your Dataset ID
             WHERE
               # Tony's modification to support TTFB and FCP and INP
               event_name IN ('LCP', 'FID', 'CLS', 'TTFB', 'FCP', 'INP', 'first_visit', 'purchase')
