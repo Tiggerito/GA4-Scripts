@@ -66,7 +66,7 @@ BEGIN
       query_version	STRING,				
       last_run_timestamp	TIMESTAMP
     )
-  OPTIONS (description = 'Version 5.1') # queryVersion
+  OPTIONS (description = 'Version 5.2') # queryVersion
   AS  
   SELECT * FROM (SELECT AS VALUE STRUCT(
     '', # schedule_frequency: how frequently the query is scheduled to run. e.g. "monthly", "every Monday", "manually"
