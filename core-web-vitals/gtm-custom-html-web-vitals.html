@@ -19,7 +19,7 @@ function sendToDataLayer(metric) {
     valueRounded: Math.round(metric.name === 'CLS' ? metric.value * 1000 : metric.value),
     deltaRounded: Math.round(metric.name === 'CLS' ? metric.delta * 1000 : metric.delta),
     debugTarget: debugTarget,
-    debugEvent: attribution ? attribution.eventType||'' : '',
+    debug_event_type: attribution ? attribution.eventType||'' : '',
     debugTiming: attribution ? attribution.loadState||'' : '',
     eventTime: attribution ? attribution.largestShiftTime||(attribution.lcpEntry&&attribution.lcpEntry.startTime)||attribution.eventTime||'': ''
   };
