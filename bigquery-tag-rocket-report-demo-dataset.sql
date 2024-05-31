@@ -1,4 +1,4 @@
-# Tag Rocket Report Demo Dataset v5.2
+# Tag Rocket Report Demo Dataset v5.3
 # https://github.com/Tiggerito/GA4-Scripts/blob/main/bigquery-tag-rocket-report-demo-dataset.sql
 
 # can only pull from datasets using the US multi region location
@@ -35,7 +35,7 @@ SELECT
       '' AS last_report_version,		
       query_version	,			
       last_run_timestamp	
-FROM `macs4u-tag-rocket.tag_rocket_313969512.meta_data`;
+FROM `vetfriends-bq-project.tag_rocket_277706400.meta_data`;
 
 # Web Vitals
 DROP TABLE IF EXISTS `web-site-advantage-ga4.tag_rocket_demo.web_vitals`;
@@ -84,12 +84,15 @@ SELECT
     region,			
     device_browser,			
     effective_connection_type,			
-    save_data,			
+    save_data,
+    navigation_type,	
+    initially_hidden,		
+    prerendered,
     width,			
     height,	
     metric_name,			
     metric_status	
-FROM `macs4u-tag-rocket.tag_rocket_313969512.web_vitals`
+FROM `vetfriends-bq-project.tag_rocket_277706400.web_vitals`
 WHERE event_date > dateToGather;
 
 # Purchases
@@ -142,7 +145,7 @@ SELECT
       END AS traffic_medium,
       user_ltv_revenue * 5 AS user_ltv_revenue,
       user_ltv_currency 
-FROM `macs4u-tag-rocket.tag_rocket_313969512.purchases`
+FROM `vetfriends-bq-project.tag_rocket_277706400.purchases`
 WHERE event_date > dateToGather;
 
 # Website Errors
@@ -174,7 +177,7 @@ SELECT
     error_lineno,
     error_colno,
     error_object_type
-FROM `macs4u-tag-rocket.tag_rocket_313969512.website_errors`
+FROM `vetfriends-bq-project.tag_rocket_277706400.website_errors`
 WHERE event_date > dateToGather;
 
 # Missing Pages
@@ -196,7 +199,7 @@ SELECT
     REPLACE(CONCAT('https://demo.com/',REPLACE(LEFT(LOWER(TO_BASE64(SHA256(page_location))), 30), '/', 'b')), '+', 'a') AS page_location,	
     page_type,
     REPLACE(CONCAT('https://referrer.com/',REPLACE(LEFT(LOWER(TO_BASE64(SHA256(page_referrer))), 30), '/', 'b')), '+', 'a') AS page_referrer
-FROM `macs4u-tag-rocket.tag_rocket_313969512.missing_pages`
+FROM `vetfriends-bq-project.tag_rocket_277706400.missing_pages`
 WHERE event_date > dateToGather;
 
 # User Sessions
@@ -271,7 +274,7 @@ SELECT
         WHEN 'referral' THEN 'referral'
         ELSE CONCAT('Medium ', MOD(ga_session_id, 9)+1) 
       END AS user_medium
-FROM `macs4u-tag-rocket.tag_rocket_313969512.user_sessions`;
+FROM `vetfriends-bq-project.tag_rocket_277706400.user_sessions`;
 #WHERE session_date > dateToGather;
 
 # Users
@@ -309,7 +312,7 @@ SELECT
         ELSE CONCAT('Medium ', MOD(UNIX_SECONDS(first_visit_timestamp), 9)+1)
       END AS user_medium
 
-FROM `macs4u-tag-rocket.tag_rocket_313969512.users`;
+FROM `vetfriends-bq-project.tag_rocket_277706400.users`;
 #WHERE session_start_timestamp > datetogather;
 
 # Billed Queries Log
@@ -327,7 +330,7 @@ SELECT
       budget_trendline_bytes,
       rolling_total_bytes,
       month_to_date_bytes
-FROM `macs4u-tag-rocket.tag_rocket_313969512.query_logs`
+FROM `vetfriends-bq-project.tag_rocket_277706400.query_logs`
 WHERE day_timestamp > timestampToGather;
 
 DROP TABLE IF EXISTS `web-site-advantage-ga4.tag_rocket_demo.project_size`;
@@ -337,7 +340,7 @@ AS
 SELECT
       date,
       REGEXP_REPLACE(REGEXP_REPLACE(dataset, r'^[^:]*', 'demo-tag-rocket'), r'[0-9]+', '1234567890') AS dataset,
-      size_bytes
-FROM `macs4u-tag-rocket.tag_rocket_313969512.project_size`;
+      size_bytes / 4 AS size_bytes
+FROM `vetfriends-bq-project.tag_rocket_277706400.project_size`;
 
 END;
