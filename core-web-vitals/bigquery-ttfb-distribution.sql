@@ -6,7 +6,7 @@ FROM (
         (SELECT TRUNC(value.double_value/100) FROM UNNEST(event_params) WHERE key = 'metric_value') AS bucket,
     FROM
         # Replace source table name
-        `your_project.analytics_123456789.events_*`
+        `${ProjectID}.${DatasetID}.events_*`
     WHERE
         event_name IN ('TTFB')
          

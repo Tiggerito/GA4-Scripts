@@ -2,9 +2,7 @@
 # Website Errors Materialised Table v3.1
 # https://github.com/Tiggerito/GA4-Scripts/blob/main/error-tracking/bigquery-materialize-table-website-errors.sql
 
-# Replace all occurances of DatasetID with your Dataset ID
-
-CREATE OR REPLACE TABLE `DatasetID.website_errors` # Replace DatasetID with your Dataset ID
+CREATE OR REPLACE TABLE `${ProjectID}.${DatasetID}.website_errors` 
   PARTITION BY DATE(event_timestamp)
 AS
 SELECT 
@@ -26,6 +24,6 @@ SELECT
     (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'error_lineno') AS error_lineno,
     (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'error_colno') AS error_colno,
     (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'error_object_type') AS error_object_type
-  FROM `DatasetID.events_*` # Replace DatasetID with your Dataset ID
+  FROM `${ProjectID}.${DatasetID}.events_*`
   WHERE event_name = 'exception';
   

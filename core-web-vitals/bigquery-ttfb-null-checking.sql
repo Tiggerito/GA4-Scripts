@@ -8,7 +8,7 @@ FROM (
         device.operating_system_version AS operating_system_version,
     FROM
         # Replace source table name
-        `vetfriends-bq-project.analytics_277706400.events_*`
+        `${ProjectID}.${DatasetID}.events_*`
     WHERE
         event_name IN ('TTFB')
                 

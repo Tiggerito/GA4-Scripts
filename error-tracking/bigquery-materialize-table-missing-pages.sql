@@ -1,9 +1,8 @@
 # Missing Page Materialised Table v3.2
 # https://github.com/Tiggerito/GA4-Scripts/blob/main/error-tracking/bigquery-materialize-table-missing-pages.sql
 
-# Replace all occurances of DatasetID with your Dataset ID
 
-CREATE OR REPLACE TABLE `DatasetID.missing_pages` # Replace DatasetID with your Dataset ID
+CREATE OR REPLACE TABLE `${ProjectID}.${DatasetID}.missing_pages` 
   PARTITION BY DATE(event_timestamp)
 AS
 SELECT 
@@ -18,6 +17,6 @@ SELECT
     (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'page_location') AS page_location,
     (SELECT COALESCE(value.string_value, CAST(value.int_value AS STRING)) FROM UNNEST(event_params) WHERE key = 'page_type') AS page_type,
     (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'page_referrer') AS page_referrer,
-  FROM `DatasetID.events_*` # Replace DatasetID with your Dataset ID
+  FROM `${ProjectID}.${DatasetID}.events_*` 
   WHERE event_name = 'page_view';
   

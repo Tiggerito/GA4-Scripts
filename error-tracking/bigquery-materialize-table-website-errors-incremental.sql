@@ -1,8 +1,6 @@
 # Website Errors Materialised Table Incremental v1.0
 # https://github.com/Tiggerito/GA4-Scripts/blob/main/error-tracking/bigquery-materialize-table-website-errors.sql
 
-# Replace all occurances of DatasetID with your Dataset ID
-
 BEGIN
   # The first run with gather all data. After that it will gather new data and merge the last 2 (or 3?) days of data
 
@@ -10,7 +8,7 @@ BEGIN
 
   # Website Errors 
 
-  IF NOT EXISTS(SELECT 1 FROM `DatasetID.__TABLES_SUMMARY__`
+  IF NOT EXISTS(SELECT 1 FROM `${ProjectID}.${DatasetID}.__TABLES_SUMMARY__`
     WHERE table_id = 'website_errors_incremental') THEN
     CREATE TABLE `DatasetID.website_errors_incremental` (
       last_updated TIMESTAMP,
@@ -46,7 +44,7 @@ BEGIN
   SET datetogather = (SELECT TIMESTAMP_TRUNC(TIMESTAMP_ADD(MAX(event_date), INTERVAL -2 DAY), DAY) FROM `DatasetID.website_errors_incremental`);
 
   # and this seems to be more expensive than replace
-  MERGE INTO `DatasetID.website_errors_incremental` A 
+  MERGE INTO `${ProjectID}.${DatasetID}.website_errors_incremental` A 
   USING (
     SELECT 
       TIMESTAMP_MICROS(event_timestamp) AS event_timestamp,
@@ -67,7 +65,7 @@ BEGIN
       (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'error_lineno') AS error_lineno,
       (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'error_colno') AS error_colno,
       (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'error_object_type') AS error_object_type
-    FROM `DatasetID.events_*` 
+    FROM `${ProjectID}.${DatasetID}.events_*` 
     WHERE event_name = 'exception'
     #AND (datetogather IS NULL OR TIMESTAMP_TRUNC(TIMESTAMP_MICROS(event_timestamp), DAY) > datetogather)
     AND (datetogather IS NULL OR _table_suffix BETWEEN FORMAT_DATE('%Y%m%d',datetogather) AND FORMAT_DATE('%Y%m%d',DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY)))
